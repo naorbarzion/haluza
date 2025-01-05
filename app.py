@@ -68,17 +68,34 @@ def admin_required(f):
 
 def create_default_users():
     try:
-        # מחיקת כל המשתמשים הקיימים
-        db.users.delete_many({})
+        # מחיקת כל הקולקציות הקיימות
+        db.users.drop()
+        db.trips.drop()
+        
+        # יצירת אינדקסים
+        db.users.create_index('username', unique=True)
+        db.trips.create_index([('user_id', 1), ('created_at', -1)])
+        db.trips.create_index([('status', 1), ('date_time', -1)])
         
         # משתמשי מנהל
         admin_users = [
-            {'username': 'admin', 'password': generate_password_hash('admin'), 'full_name': 'מנהל ראשי', 'role': 'admin'},
-            {'username': 'admin2', 'password': generate_password_hash('1234'), 'full_name': 'מנהל משנה', 'role': 'admin'}
+            {
+                'username': 'admin',
+                'password': generate_password_hash('admin'),
+                'full_name': 'מנהל ראשי',
+                'role': 'admin'
+            },
+            {
+                'username': 'admin2',
+                'password': generate_password_hash('1234'),
+                'full_name': 'מנהל משנה',
+                'role': 'admin'
+            }
         ]
         
-        db.users.insert_many(admin_users)
-        logger.info("Added admin users")
+        # הוספת משתמשי מנהל
+        result = db.users.insert_many(admin_users)
+        logger.info(f"Added {len(result.inserted_ids)} admin users")
         
         # משתמשי נהגים
         drivers = [
@@ -100,13 +117,24 @@ def create_default_users():
             {'username': 'driver16', 'password': generate_password_hash('1234'), 'full_name': 'גד החוזה', 'role': 'driver'}
         ]
         
-        db.users.insert_many(drivers)
-        logger.info("Added driver users")
+        # הוספת משתמשי נהגים
+        result = db.users.insert_many(drivers)
+        logger.info(f"Added {len(result.inserted_ids)} driver users")
         
-        # יצירת אינדקסים
-        db.users.create_index('username', unique=True)
-        db.trips.create_index([('user_id', 1), ('created_at', -1)])
-        db.trips.create_index([('status', 1), ('date_time', -1)])
+        # יצירת נסיעה לדוגמה
+        example_driver = db.users.find_one({'username': 'driver1'})
+        if example_driver:
+            example_trip = {
+                'user_id': example_driver['_id'],
+                'vehicle': 'car1',
+                'date_time': datetime.utcnow().isoformat(),
+                'purpose': 'נסיעת דוגמה',
+                'destination': 'תל אביב',
+                'status': 'pending',
+                'created_at': datetime.utcnow()
+            }
+            db.trips.insert_one(example_trip)
+            logger.info("Added example trip")
         
         return True
     except Exception as e:
@@ -177,6 +205,7 @@ def submit_trip():
             'purpose': data['purpose'],
             'destination': data['destination'],
             'status': 'pending',
+            'rejection_reason': None,
             'created_at': datetime.utcnow()
         }
         
@@ -191,8 +220,11 @@ def submit_trip():
             'purpose': trip['purpose'],
             'destination': trip['destination'],
             'status': trip['status'],
-            'created_at': trip['created_at']
+            'rejection_reason': trip['rejection_reason'],
+            'created_at': trip['created_at'].isoformat()
         }
+        
+        logger.info(f"New trip submitted: {trip_response}")
         
         return jsonify({
             "status": "success",
@@ -208,17 +240,24 @@ def submit_trip():
 @login_required
 def driver_get_trips():
     try:
-        trips = list(db.trips.find({'user_id': ObjectId(session['user_id'])}).sort('created_at', -1))
+        # שליפת כל הנסיעות של הנהג
+        trips = list(db.trips.find(
+            {'user_id': ObjectId(session['user_id'])}
+        ).sort('created_at', -1))
         
-        # המרת ObjectId ל-string
+        # המרת ObjectId למחרוזת
         for trip in trips:
             trip['_id'] = str(trip['_id'])
             trip['user_id'] = str(trip['user_id'])
+            # המרת תאריכים למחרוזות
+            if 'created_at' in trip and isinstance(trip['created_at'], datetime):
+                trip['created_at'] = trip['created_at'].isoformat()
         
+        logger.info(f"Retrieved {len(trips)} trips for driver {session['user_id']}")
         return jsonify(trips)
         
     except Exception as e:
-        print(f"Error in driver_get_trips: {str(e)}")
+        logger.error(f"Error in driver_get_trips: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/logout')
@@ -373,7 +412,7 @@ def update_trip_status():
         
         # הכנת אובייקט התגובה
         response_trip = {
-            '_id': str(updated_trip['_id']),  # שינוי מ-id ל-_id
+            '_id': str(updated_trip['_id']),
             'user_id': str(updated_trip['user_id']),
             'vehicle': updated_trip['vehicle'],
             'date_time': updated_trip['date_time'],
@@ -381,7 +420,7 @@ def update_trip_status():
             'destination': updated_trip.get('destination', ''),
             'status': updated_trip['status'],
             'rejection_reason': updated_trip.get('rejection_reason', ''),
-            'created_at': updated_trip.get('created_at', ''),
+            'created_at': updated_trip.get('created_at', '').isoformat() if updated_trip.get('created_at') else '',
             'driver_name': driver['full_name'] if driver else 'לא ידוע'
         }
         
@@ -517,7 +556,11 @@ def admin_get_trips():
             trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
             # הסרת שדה עזר
             trip.pop('statusOrder', None)
+            # המרת תאריכים למחרוזות
+            if 'created_at' in trip and isinstance(trip['created_at'], datetime):
+                trip['created_at'] = trip['created_at'].isoformat()
         
+        logger.info(f"Retrieved {len(trips)} trips")
         return jsonify(trips)
         
     except Exception as e:
