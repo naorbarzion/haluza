@@ -83,11 +83,30 @@ def create_default_users():
         # משתמשי נהגים
         drivers = [
             {'username': 'driver1', 'password': generate_password_hash('1234'), 'full_name': 'משה כהן', 'role': 'driver'},
-            {'username': 'driver2', 'password': generate_password_hash('1234'), 'full_name': 'יוסי לוי', 'role': 'driver'}
+            {'username': 'driver2', 'password': generate_password_hash('1234'), 'full_name': 'יוסי לוי', 'role': 'driver'},
+            {'username': 'driver3', 'password': generate_password_hash('1234'), 'full_name': 'דוד כהן', 'role': 'driver'},
+            {'username': 'driver4', 'password': generate_password_hash('1234'), 'full_name': 'יעקב אברהם', 'role': 'driver'},
+            {'username': 'driver5', 'password': generate_password_hash('1234'), 'full_name': 'דניאל דוד', 'role': 'driver'},
+            {'username': 'driver6', 'password': generate_password_hash('1234'), 'full_name': 'אברהם יצחק', 'role': 'driver'},
+            {'username': 'driver7', 'password': generate_password_hash('1234'), 'full_name': 'יצחק משה', 'role': 'driver'},
+            {'username': 'driver8', 'password': generate_password_hash('1234'), 'full_name': 'שמואל שלום', 'role': 'driver'},
+            {'username': 'driver9', 'password': generate_password_hash('1234'), 'full_name': 'אהרון הכהן', 'role': 'driver'},
+            {'username': 'driver10', 'password': generate_password_hash('1234'), 'full_name': 'מאיר דוד', 'role': 'driver'},
+            {'username': 'driver11', 'password': generate_password_hash('1234'), 'full_name': 'חיים כהן', 'role': 'driver'},
+            {'username': 'driver12', 'password': generate_password_hash('1234'), 'full_name': 'יונתן לוי', 'role': 'driver'},
+            {'username': 'driver13', 'password': generate_password_hash('1234'), 'full_name': 'אליהו הנביא', 'role': 'driver'},
+            {'username': 'driver14', 'password': generate_password_hash('1234'), 'full_name': 'שלמה המלך', 'role': 'driver'},
+            {'username': 'driver15', 'password': generate_password_hash('1234'), 'full_name': 'דן הגיבור', 'role': 'driver'},
+            {'username': 'driver16', 'password': generate_password_hash('1234'), 'full_name': 'גד החוזה', 'role': 'driver'}
         ]
         
         db.users.insert_many(drivers)
         logger.info("Added driver users")
+        
+        # יצירת אינדקסים
+        db.users.create_index('username', unique=True)
+        db.trips.create_index([('user_id', 1), ('created_at', -1)])
+        db.trips.create_index([('status', 1), ('date_time', -1)])
         
         return True
     except Exception as e:
