@@ -1,3 +1,5 @@
-pip freeze
-pip flask
-
+flask
+werkzeug
+pandas
+openpyxl
+xlsxwriter
