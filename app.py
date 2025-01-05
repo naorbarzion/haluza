@@ -50,7 +50,6 @@ def get_greeting(hour):
     else:
         return "לילה טוב"
 
-# הוספת הדקורטורים החסרים
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -63,7 +62,7 @@ def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'role' not in session or session['role'] != 'admin':
-            return redirect(url_for('index'))
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -107,14 +106,16 @@ def init_database():
 
 @app.route('/')
 def index():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    if session.get('role') == 'admin':
-        return redirect(url_for('admin_dashboard'))
-    return redirect(url_for('driver_dashboard'))
+    return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # אם המשתמש כבר מחובר, נפנה אותו לדף המתאים
+    if 'user_id' in session:
+        if session.get('role') == 'admin':
+            return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('driver_dashboard'))
+
     try:
         if request.method == 'POST':
             username = request.form['username']
