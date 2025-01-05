@@ -6,8 +6,14 @@ import os
 import pandas as pd
 from io import BytesIO
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+import logging
 from dotenv import load_dotenv
 from bson import ObjectId
+
+# הגדרת logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # טעינת משתני הסביבה
 load_dotenv()
@@ -15,31 +21,58 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'your_secret_key_here')
 
-# התחברות ל-MongoDB
-client = MongoClient(os.getenv('MONGODB_URI'))
-db = client.tracer_db
+# התחברות ל-MongoDB עם טיפול שגיאות
+try:
+    MONGODB_URI = os.getenv('MONGODB_URI')
+    if not MONGODB_URI:
+        raise ValueError("MONGODB_URI is not set in environment variables")
+    
+    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
+    # בדיקת חיבור
+    client.admin.command('ping')
+    logger.info("Successfully connected to MongoDB")
+    
+    db = client.tracer_db
+except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+    logger.error(f"Could not connect to MongoDB: {e}")
+    raise
+except Exception as e:
+    logger.error(f"An error occurred while connecting to MongoDB: {e}")
+    raise
 
 def init_db():
-    # בדיקה אם יש כבר משתמשים במערכת
-    if db.users.count_documents({}) == 0:
-        # משתמשי מנהל
-        admin_users = [
-            {'username': 'admin', 'password': generate_password_hash('admin'), 'full_name': 'מנהל ראשי', 'role': 'admin'},
-            {'username': 'admin2', 'password': generate_password_hash('1234'), 'full_name': 'מנהל משנה', 'role': 'admin'}
-        ]
-        
-        db.users.insert_many(admin_users)
-        
-        # משתמשי נהגים
-        drivers = [
-            {'username': 'driver1', 'password': generate_password_hash('1234'), 'full_name': 'משה כהן', 'role': 'driver'},
-            {'username': 'driver2', 'password': generate_password_hash('1234'), 'full_name': 'יוסי לוי', 'role': 'driver'}
-        ]
-        
-        db.users.insert_many(drivers)
+    try:
+        # בדיקה אם יש כבר משתמשים במערכת
+        if db.users.count_documents({}) == 0:
+            logger.info("Initializing database with default users")
+            
+            # משתמשי מנהל
+            admin_users = [
+                {'username': 'admin', 'password': generate_password_hash('admin'), 'full_name': 'מנהל ראשי', 'role': 'admin'},
+                {'username': 'admin2', 'password': generate_password_hash('1234'), 'full_name': 'מנהל משנה', 'role': 'admin'}
+            ]
+            
+            db.users.insert_many(admin_users)
+            logger.info("Added admin users")
+            
+            # משתמשי נהגים
+            drivers = [
+                {'username': 'driver1', 'password': generate_password_hash('1234'), 'full_name': 'משה כהן', 'role': 'driver'},
+                {'username': 'driver2', 'password': generate_password_hash('1234'), 'full_name': 'יוסי לוי', 'role': 'driver'}
+            ]
+            
+            db.users.insert_many(drivers)
+            logger.info("Added driver users")
+            
+    except Exception as e:
+        logger.error(f"Error initializing database: {e}")
+        raise
 
 # קריאה לפונקציה ליצירת משתמשים ראשוניים
-init_db()
+try:
+    init_db()
+except Exception as e:
+    logger.error(f"Failed to initialize database: {e}")
 
 def login_required(f):
     @wraps(f)
@@ -57,27 +90,39 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+@app.route('/')
+def index():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    if session.get('role') == 'admin':
+        return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('driver_dashboard'))
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        user = db.users.find_one({'username': username})
-        
-        if user and check_password_hash(user['password'], password):
-            session['user_id'] = str(user['_id'])
-            session['username'] = user['username']
-            session['full_name'] = user['full_name']
-            session['role'] = user['role']
+    try:
+        if request.method == 'POST':
+            username = request.form['username']
+            password = request.form['password']
             
-            if user['role'] == 'admin':
-                return redirect(url_for('admin_dashboard'))
-            return redirect(url_for('driver_dashboard'))
+            user = db.users.find_one({'username': username})
+            
+            if user and check_password_hash(user['password'], password):
+                session['user_id'] = str(user['_id'])
+                session['username'] = user['username']
+                session['full_name'] = user['full_name']
+                session['role'] = user['role']
+                
+                if user['role'] == 'admin':
+                    return redirect(url_for('admin_dashboard'))
+                return redirect(url_for('driver_dashboard'))
+            
+            return render_template('login.html', error='שם משתמש או סיסמה שגויים')
         
-        return render_template('login.html', error='שם משתמש או סיסמה שגויים')
-    
-    return render_template('login.html')
+        return render_template('login.html')
+    except Exception as e:
+        logger.error(f"Error in login route: {e}")
+        return render_template('login.html', error='אירעה שגיאה במערכת, אנא נסה שוב מאוחר יותר')
 
 @app.route('/driver/submit_trip', methods=['POST'])
 @login_required
@@ -128,3 +173,6 @@ def driver_get_trips():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ... המשך הקוד עם התאמות דומות לכל הפונקציות ...
+
+if __name__ == '__main__':
+    app.run(debug=False)  # שינוי ל-False בסביבת ייצור
