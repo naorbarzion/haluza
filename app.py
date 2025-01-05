@@ -317,10 +317,19 @@ def update_trip_status():
         logger.info(f"Updating trip status with data: {data}")
         
         # בדיקה שכל השדות הנדרשים קיימים
+        if not data:
+            logger.error("No JSON data received")
+            return jsonify({"status": "error", "message": "לא התקבלו נתונים"}), 400
+            
+        if '_id' in data:  # אם הנתונים מגיעים עם _id במקום trip_id
+            data['trip_id'] = data.pop('_id')
+            
         if not data.get('trip_id'):
+            logger.error("Missing trip_id in request")
             return jsonify({"status": "error", "message": "חסר מזהה נסיעה"}), 400
             
         if not data.get('status'):
+            logger.error("Missing status in request")
             return jsonify({"status": "error", "message": "חסר סטטוס"}), 400
         
         # הכנת נתוני העדכון
@@ -332,11 +341,15 @@ def update_trip_status():
         if data.get('rejection_reason'):
             update_data['rejection_reason'] = data['rejection_reason']
         elif data['status'] == 'rejected' and not data.get('rejection_reason'):
+            logger.error("Missing rejection reason for rejected status")
             return jsonify({"status": "error", "message": "חסרה סיבת דחייה"}), 400
         
         try:
-            trip_id = ObjectId(data['trip_id'])
-        except:
+            trip_id = data['trip_id']
+            if isinstance(trip_id, str):
+                trip_id = ObjectId(trip_id)
+        except Exception as e:
+            logger.error(f"Invalid trip_id format: {e}")
             return jsonify({"status": "error", "message": "מזהה נסיעה לא תקין"}), 400
         
         # עדכון הנסיעה
@@ -346,11 +359,13 @@ def update_trip_status():
         )
         
         if result.modified_count == 0:
+            logger.error(f"Trip {trip_id} not found")
             return jsonify({"status": "error", "message": "הנסיעה לא נמצאה"}), 404
         
         # שליפת הנסיעה המעודכנת
         updated_trip = db.trips.find_one({'_id': trip_id})
         if not updated_trip:
+            logger.error(f"Could not fetch updated trip {trip_id}")
             return jsonify({"status": "error", "message": "שגיאה בשליפת הנסיעה המעודכנת"}), 500
             
         # שליפת פרטי הנהג
@@ -358,7 +373,7 @@ def update_trip_status():
         
         # הכנת אובייקט התגובה
         response_trip = {
-            'id': str(updated_trip['_id']),
+            '_id': str(updated_trip['_id']),  # שינוי מ-id ל-_id
             'user_id': str(updated_trip['user_id']),
             'vehicle': updated_trip['vehicle'],
             'date_time': updated_trip['date_time'],
