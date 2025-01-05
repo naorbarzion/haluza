@@ -314,36 +314,75 @@ def search_trips():
 def update_trip_status():
     try:
         data = request.json
+        logger.info(f"Updating trip status with data: {data}")
         
+        # בדיקה שכל השדות הנדרשים קיימים
+        if not data.get('trip_id'):
+            return jsonify({"status": "error", "message": "חסר מזהה נסיעה"}), 400
+            
+        if not data.get('status'):
+            return jsonify({"status": "error", "message": "חסר סטטוס"}), 400
+        
+        # הכנת נתוני העדכון
         update_data = {
             'status': data['status']
         }
+        
+        # הוספת סיבת דחייה אם קיימת
         if data.get('rejection_reason'):
             update_data['rejection_reason'] = data['rejection_reason']
+        elif data['status'] == 'rejected' and not data.get('rejection_reason'):
+            return jsonify({"status": "error", "message": "חסרה סיבת דחייה"}), 400
         
+        try:
+            trip_id = ObjectId(data['trip_id'])
+        except:
+            return jsonify({"status": "error", "message": "מזהה נסיעה לא תקין"}), 400
+        
+        # עדכון הנסיעה
         result = db.trips.update_one(
-            {'_id': ObjectId(data['trip_id'])},
+            {'_id': trip_id},
             {'$set': update_data}
         )
         
         if result.modified_count == 0:
             return jsonify({"status": "error", "message": "הנסיעה לא נמצאה"}), 404
         
-        updated_trip = db.trips.find_one({'_id': ObjectId(data['trip_id'])})
+        # שליפת הנסיעה המעודכנת
+        updated_trip = db.trips.find_one({'_id': trip_id})
+        if not updated_trip:
+            return jsonify({"status": "error", "message": "שגיאה בשליפת הנסיעה המעודכנת"}), 500
+            
+        # שליפת פרטי הנהג
         driver = db.users.find_one({'_id': updated_trip['user_id']})
         
-        updated_trip['_id'] = str(updated_trip['_id'])
-        updated_trip['user_id'] = str(updated_trip['user_id'])
-        updated_trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
+        # הכנת אובייקט התגובה
+        response_trip = {
+            'id': str(updated_trip['_id']),
+            'user_id': str(updated_trip['user_id']),
+            'vehicle': updated_trip['vehicle'],
+            'date_time': updated_trip['date_time'],
+            'purpose': updated_trip['purpose'],
+            'destination': updated_trip.get('destination', ''),
+            'status': updated_trip['status'],
+            'rejection_reason': updated_trip.get('rejection_reason', ''),
+            'created_at': updated_trip.get('created_at', ''),
+            'driver_name': driver['full_name'] if driver else 'לא ידוע'
+        }
         
+        logger.info(f"Successfully updated trip {trip_id} to status {data['status']}")
         return jsonify({
             "status": "success",
-            "trip": updated_trip
+            "message": "סטטוס הנסיעה עודכן בהצלחה",
+            "trip": response_trip
         })
         
     except Exception as e:
         logger.error(f"Error in update_trip_status: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({
+            "status": "error", 
+            "message": f"שגיאה בעדכון סטטוס הנסיעה: {str(e)}"
+        }), 500
 
 @app.route('/admin/export_trips', methods=['POST'])
 @login_required
