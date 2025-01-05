@@ -324,32 +324,43 @@
             }
         }
 
-        // Approve trip
-        async function approveTrip(tripId) {
+        async function updateTripStatus(tripId, status, rejectionReason = '') {
             try {
                 const response = await fetch('/admin/update_trip_status', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         trip_id: tripId,
-                        status: 'approved'
+                        status: status,
+                        rejection_reason: rejectionReason
                     })
                 });
 
-                if (response.ok) {
-                    showNotification('הנסיעה אושרה בהצלחה', 'success');
-                    loadTrips();
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // רענון הנסיעות
+                    await loadTrips();
+                    return true;
                 } else {
-                    throw new Error('Failed to approve trip');
+                    alert(data.message || 'אירעה שגיאה בעדכון הנסיעה');
+                    return false;
                 }
             } catch (error) {
-                showNotification('אירעה שגיאה באישור הנסיעה', 'error');
+                console.error('Error updating trip status:', error);
+                alert('אירעה שגיאה בעדכון הנסיעה');
+                return false;
             }
         }
 
-        // Reject trip
+        async function approveTrip(tripId) {
+            if (await updateTripStatus(tripId, 'approved')) {
+                alert('הנסיעה אושרה בהצלחה');
+            }
+        }
+
         function showRejectModal(tripId) {
             document.getElementById('rejectTripId').value = tripId;
             document.getElementById('rejectModal').classList.remove('hidden');
@@ -357,36 +368,18 @@
 
         function closeRejectModal() {
             document.getElementById('rejectModal').classList.add('hidden');
-            document.getElementById('rejectForm').reset();
+            document.getElementById('rejectionReason').value = '';
         }
 
         document.getElementById('rejectForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            
             const tripId = document.getElementById('rejectTripId').value;
-            const reason = document.getElementById('rejectionReason').value;
-
-            try {
-                const response = await fetch('/admin/update_trip_status', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        trip_id: tripId,
-                        status: 'rejected',
-                        rejection_reason: reason
-                    })
-                });
-
-                if (response.ok) {
-                    showNotification('הנסיעה נדחתה', 'success');
-                    closeRejectModal();
-                    loadTrips();
-                } else {
-                    throw new Error('Failed to reject trip');
-                }
-            } catch (error) {
-                showNotification('אירעה שגיאה בדחיית הנסיעה', 'error');
+            const rejectionReason = document.getElementById('rejectionReason').value;
+            
+            if (await updateTripStatus(tripId, 'rejected', rejectionReason)) {
+                closeRejectModal();
+                alert('הנסיעה נדחתה בהצלחה');
             }
         });
 
