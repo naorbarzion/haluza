@@ -359,12 +359,11 @@ def update_trip_status():
         if not data:
             logger.error("No JSON data received")
             return jsonify({"status": "error", "message": "לא התקבלו נתונים"}), 400
-            
-        if '_id' in data:  # אם הנתונים מגיעים עם _id במקום trip_id
-            data['trip_id'] = data.pop('_id')
-            
-        if not data.get('trip_id'):
-            logger.error("Missing trip_id in request")
+        
+        # קבלת מזהה הנסיעה מהבקשה
+        trip_id = data.get('_id') or data.get('trip_id')
+        if not trip_id:
+            logger.error("Missing trip ID in request")
             return jsonify({"status": "error", "message": "חסר מזהה נסיעה"}), 400
             
         if not data.get('status'):
@@ -384,7 +383,6 @@ def update_trip_status():
             return jsonify({"status": "error", "message": "חסרה סיבת דחייה"}), 400
         
         try:
-            trip_id = data['trip_id']
             if isinstance(trip_id, str):
                 trip_id = ObjectId(trip_id)
         except Exception as e:
