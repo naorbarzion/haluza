@@ -40,40 +40,7 @@ except Exception as e:
     logger.error(f"An error occurred while connecting to MongoDB: {e}")
     raise
 
-def init_db():
-    try:
-        # בדיקה אם יש כבר משתמשים במערכת
-        if db.users.count_documents({}) == 0:
-            logger.info("Initializing database with default users")
-            
-            # משתמשי מנהל
-            admin_users = [
-                {'username': 'admin', 'password': generate_password_hash('admin'), 'full_name': 'מנהל ראשי', 'role': 'admin'},
-                {'username': 'admin2', 'password': generate_password_hash('1234'), 'full_name': 'מנהל משנה', 'role': 'admin'}
-            ]
-            
-            db.users.insert_many(admin_users)
-            logger.info("Added admin users")
-            
-            # משתמשי נהגים
-            drivers = [
-                {'username': 'driver1', 'password': generate_password_hash('1234'), 'full_name': 'משה כהן', 'role': 'driver'},
-                {'username': 'driver2', 'password': generate_password_hash('1234'), 'full_name': 'יוסי לוי', 'role': 'driver'}
-            ]
-            
-            db.users.insert_many(drivers)
-            logger.info("Added driver users")
-            
-    except Exception as e:
-        logger.error(f"Error initializing database: {e}")
-        raise
-
-# קריאה לפונקציה ליצירת משתמשים ראשוניים
-try:
-    init_db()
-except Exception as e:
-    logger.error(f"Failed to initialize database: {e}")
-
+# הוספת הדקורטורים החסרים
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -89,6 +56,44 @@ def admin_required(f):
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
+
+def create_default_users():
+    try:
+        # מחיקת כל המשתמשים הקיימים
+        db.users.delete_many({})
+        
+        # משתמשי מנהל
+        admin_users = [
+            {'username': 'admin', 'password': generate_password_hash('admin'), 'full_name': 'מנהל ראשי', 'role': 'admin'},
+            {'username': 'admin2', 'password': generate_password_hash('1234'), 'full_name': 'מנהל משנה', 'role': 'admin'}
+        ]
+        
+        db.users.insert_many(admin_users)
+        logger.info("Added admin users")
+        
+        # משתמשי נהגים
+        drivers = [
+            {'username': 'driver1', 'password': generate_password_hash('1234'), 'full_name': 'משה כהן', 'role': 'driver'},
+            {'username': 'driver2', 'password': generate_password_hash('1234'), 'full_name': 'יוסי לוי', 'role': 'driver'}
+        ]
+        
+        db.users.insert_many(drivers)
+        logger.info("Added driver users")
+        
+        return True
+    except Exception as e:
+        logger.error(f"Error creating default users: {e}")
+        return False
+
+@app.route('/init-db')
+def init_database():
+    try:
+        if create_default_users():
+            return jsonify({"status": "success", "message": "משתמשים נוצרו בהצלחה"})
+        else:
+            return jsonify({"status": "error", "message": "שגיאה ביצירת משתמשים"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/')
 def index():
@@ -106,17 +111,20 @@ def login():
             password = request.form['password']
             
             user = db.users.find_one({'username': username})
+            logger.info(f"Login attempt for user: {username}")
             
             if user and check_password_hash(user['password'], password):
                 session['user_id'] = str(user['_id'])
                 session['username'] = user['username']
                 session['full_name'] = user['full_name']
                 session['role'] = user['role']
+                logger.info(f"Successful login for user: {username}")
                 
                 if user['role'] == 'admin':
                     return redirect(url_for('admin_dashboard'))
                 return redirect(url_for('driver_dashboard'))
             
+            logger.warning(f"Failed login attempt for user: {username}")
             return render_template('login.html', error='שם משתמש או סיסמה שגויים')
         
         return render_template('login.html')
