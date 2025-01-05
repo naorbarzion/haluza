@@ -162,16 +162,27 @@ def submit_trip():
         }
         
         result = db.trips.insert_one(trip)
-        trip['_id'] = str(result.inserted_id)
+        
+        # המרת ObjectId למחרוזת לפני החזרה
+        trip_response = {
+            '_id': str(result.inserted_id),
+            'user_id': str(trip['user_id']),
+            'vehicle': trip['vehicle'],
+            'date_time': trip['date_time'],
+            'purpose': trip['purpose'],
+            'destination': trip['destination'],
+            'status': trip['status'],
+            'created_at': trip['created_at']
+        }
         
         return jsonify({
             "status": "success",
             "message": "הנסיעה נוספה בהצלחה",
-            "trip": trip
+            "trip": trip_response
         })
         
     except Exception as e:
-        print(f"Error in submit_trip: {str(e)}")
+        logger.error(f"Error in submit_trip: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/driver/get_trips')
@@ -392,6 +403,52 @@ def export_trips():
         
     except Exception as e:
         logger.error(f"Error exporting trips: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/admin/get_trips')
+@login_required
+@admin_required
+def admin_get_trips():
+    try:
+        # מיון לפי סטטוס (pending ראשון) ואז לפי תאריך
+        pipeline = [
+            {
+                '$addFields': {
+                    'statusOrder': {
+                        '$switch': {
+                            'branches': [
+                                {'case': {'$eq': ['$status', 'pending']}, 'then': 1},
+                                {'case': {'$eq': ['$status', 'approved']}, 'then': 2},
+                                {'case': {'$eq': ['$status', 'rejected']}, 'then': 3}
+                            ],
+                            'default': 4
+                        }
+                    }
+                }
+            },
+            {
+                '$sort': {
+                    'statusOrder': 1,
+                    'date_time': -1
+                }
+            }
+        ]
+        
+        trips = list(db.trips.aggregate(pipeline))
+        
+        # המרת ObjectId למחרוזת והוספת שם הנהג
+        for trip in trips:
+            trip['_id'] = str(trip['_id'])
+            trip['user_id'] = str(trip['user_id'])
+            driver = db.users.find_one({'_id': ObjectId(trip['user_id'])})
+            trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
+            # הסרת שדה עזר
+            trip.pop('statusOrder', None)
+        
+        return jsonify(trips)
+        
+    except Exception as e:
+        logger.error(f"Error in admin_get_trips: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
