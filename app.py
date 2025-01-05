@@ -40,6 +40,16 @@ except Exception as e:
     logger.error(f"An error occurred while connecting to MongoDB: {e}")
     raise
 
+def get_greeting(hour):
+    if 5 <= hour < 12:
+        return "בוקר טוב"
+    elif 12 <= hour < 18:
+        return "צהריים טובים"
+    elif 18 <= hour < 22:
+        return "ערב טוב"
+    else:
+        return "לילה טוב"
+
 # הוספת הדקורטורים החסרים
 def login_required(f):
     @wraps(f)
@@ -180,7 +190,208 @@ def driver_get_trips():
         print(f"Error in driver_get_trips: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# ... המשך הקוד עם התאמות דומות לכל הפונקציות ...
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/driver/dashboard')
+@login_required
+def driver_dashboard():
+    if session.get('role') != 'driver':
+        return redirect(url_for('index'))
+    current_hour = datetime.now().hour
+    greeting = get_greeting(current_hour)
+    return render_template('driver_dashboard.html', 
+                         greeting=greeting,
+                         full_name=session.get('full_name'))
+
+@app.route('/admin/dashboard')
+@login_required
+@admin_required
+def admin_dashboard():
+    return render_template('admin_dashboard.html', 
+                         full_name=session.get('full_name'))
+
+@app.route('/admin/reports')
+@login_required
+@admin_required
+def reports():
+    return render_template('reports.html', 
+                         full_name=session.get('full_name'))
+
+@app.route('/admin/get_drivers')
+@login_required
+@admin_required
+def get_drivers():
+    try:
+        drivers = list(db.users.find({'role': 'driver'}, {'_id': 1, 'full_name': 1}).sort('full_name', 1))
+        
+        # המרת ObjectId ל-string
+        for driver in drivers:
+            driver['id'] = str(driver['_id'])
+            del driver['_id']
+        
+        return jsonify(drivers)
+        
+    except Exception as e:
+        logger.error(f"Error getting drivers: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/admin/search_trips', methods=['POST'])
+@login_required
+@admin_required
+def search_trips():
+    try:
+        data = request.json
+        query = {}
+        
+        if data.get('date_from'):
+            query['date_time'] = {'$gte': data['date_from']}
+        
+        if data.get('date_to'):
+            if 'date_time' in query:
+                query['date_time']['$lte'] = data['date_to']
+            else:
+                query['date_time'] = {'$lte': data['date_to']}
+        
+        if data.get('driver_id'):
+            query['user_id'] = ObjectId(data['driver_id'])
+        
+        if data.get('status'):
+            query['status'] = data['status']
+        
+        trips = list(db.trips.find(query).sort('date_time', -1))
+        
+        # המרת ObjectId ל-string
+        for trip in trips:
+            trip['_id'] = str(trip['_id'])
+            trip['user_id'] = str(trip['user_id'])
+            # הוספת שם הנהג
+            driver = db.users.find_one({'_id': ObjectId(trip['user_id'])})
+            trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
+        
+        return jsonify(trips)
+        
+    except Exception as e:
+        logger.error(f"Error searching trips: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/admin/update_trip_status', methods=['POST'])
+@login_required
+@admin_required
+def update_trip_status():
+    try:
+        data = request.json
+        
+        update_data = {
+            'status': data['status']
+        }
+        if data.get('rejection_reason'):
+            update_data['rejection_reason'] = data['rejection_reason']
+        
+        result = db.trips.update_one(
+            {'_id': ObjectId(data['trip_id'])},
+            {'$set': update_data}
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({"status": "error", "message": "הנסיעה לא נמצאה"}), 404
+        
+        updated_trip = db.trips.find_one({'_id': ObjectId(data['trip_id'])})
+        driver = db.users.find_one({'_id': updated_trip['user_id']})
+        
+        updated_trip['_id'] = str(updated_trip['_id'])
+        updated_trip['user_id'] = str(updated_trip['user_id'])
+        updated_trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
+        
+        return jsonify({
+            "status": "success",
+            "trip": updated_trip
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in update_trip_status: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/admin/export_trips', methods=['POST'])
+@login_required
+@admin_required
+def export_trips():
+    try:
+        data = request.json
+        query = {}
+        
+        if data.get('date_from'):
+            query['date_time'] = {'$gte': data['date_from']}
+        
+        if data.get('date_to'):
+            if 'date_time' in query:
+                query['date_time']['$lte'] = data['date_to']
+            else:
+                query['date_time'] = {'$lte': data['date_to']}
+        
+        if data.get('driver_id'):
+            query['user_id'] = ObjectId(data['driver_id'])
+        
+        if data.get('status'):
+            query['status'] = data['status']
+        
+        trips = list(db.trips.find(query).sort('date_time', -1))
+        
+        # הכנת הנתונים לאקסל
+        excel_data = []
+        for trip in trips:
+            driver = db.users.find_one({'_id': trip['user_id']})
+            excel_data.append({
+                'תאריך ושעה': trip['date_time'],
+                'שם הנהג': driver['full_name'] if driver else 'לא ידוע',
+                'רכב': trip['vehicle'],
+                'מטרת נסיעה': trip['purpose'],
+                'יעד': trip.get('destination', ''),
+                'סטטוס': trip['status'],
+                'תאריך יצירה': trip['created_at']
+            })
+        
+        df = pd.DataFrame(excel_data)
+        
+        # מיפוי ערכים
+        status_map = {
+            'pending': 'ממתין לאישור',
+            'approved': 'מאושר',
+            'rejected': 'נדחה'
+        }
+        df['סטטוס'] = df['סטטוס'].map(status_map)
+        
+        vehicle_map = {
+            'car1': 'טויוטה קורולה - 12-345-67',
+            'car2': 'יונדאי i35 - 23-456-78',
+            'car3': 'סקודה אוקטביה - 34-567-89'
+        }
+        df['רכב'] = df['רכב'].map(vehicle_map)
+        
+        # יצירת קובץ אקסל
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='דוח נסיעות')
+            worksheet = writer.sheets['דוח נסיעות']
+            
+            for idx, col in enumerate(df.columns):
+                max_length = max(df[col].astype(str).apply(len).max(), len(col)) + 2
+                worksheet.set_column(idx, idx, max_length)
+        
+        output.seek(0)
+        
+        return send_file(
+            output,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'דוח_נסיעות_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exporting trips: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=False)  # שינוי ל-False בסביבת ייצור
