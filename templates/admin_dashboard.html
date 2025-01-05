@@ -403,26 +403,31 @@
             const newDateTime = document.getElementById('newDateTime').value;
 
             try {
+                console.log('Rescheduling trip:', { tripId, newDateTime });
                 const response = await fetch('/admin/reschedule_trip', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        trip_id: tripId,
+                        _id: tripId,
                         new_date_time: newDateTime
                     })
                 });
 
-                if (response.ok) {
-                    showNotification('מועד הנסיעה עודכן', 'success');
+                const data = await response.json();
+                console.log('Server response:', data);
+                
+                if (data.status === 'success') {
                     closeRescheduleModal();
-                    loadTrips();
+                    alert('מועד הנסיעה עודכן בהצלחה');
+                    await loadTrips();
                 } else {
-                    throw new Error('Failed to reschedule trip');
+                    alert(data.message || 'אירעה שגיאה בעדכון מועד הנסיעה');
                 }
             } catch (error) {
-                showNotification('אירעה שגיאה בעדכון מועד הנסיעה', 'error');
+                console.error('Error rescheduling trip:', error);
+                alert('אירעה שגיאה בעדכון מועד הנסיעה');
             }
         });
 
