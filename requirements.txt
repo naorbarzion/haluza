@@ -3,3 +3,5 @@ werkzeug
 pandas
 openpyxl
 xlsxwriter
+pymongo
+python-dotenv
