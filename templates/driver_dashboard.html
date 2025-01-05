@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>מערכת רישום נסיעות - Tracer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .trip-card {
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+
+        .trip-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+        }
+
+        .status-badge {
+            transition: all 0.3s ease;
+        }
+
+        .status-badge:hover {
+            transform: scale(1.05);
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .notification {
+            animation: slideIn 0.5s ease-out forwards;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <!-- Logo -->
+                <img src="https://tracer.co.il/wp-content/uploads/elementor/thumbs/Logo-H-p8d906f0bmrgobnn9uwquzibery89mtbvr1plpc910.png" 
+                     alt="Tracer Logo" 
+                     class="h-12 hover:opacity-90 transition-opacity">
+                
+                <!-- User Menu -->
+                <div class="flex items-center gap-4">
+                    <div class="text-lg font-medium text-gray-700">
+                        <i class="fas fa-sun ml-2"></i>
+                        <span class="greeting-text">{{ greeting }}</span>
+                        <span class="user-name font-bold">{{ full_name }}</span>
+                    </div>
+                    <a href="{{ url_for('logout') }}" 
+                       class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2">
+                        <i class="fas fa-sign-out-alt"></i>
+                        התנתק
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        <!-- Trip Form Card -->
+        <div class="glass-effect rounded-2xl shadow-lg p-8">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="bg-blue-100 p-3 rounded-lg">
+                    <i class="fas fa-car text-blue-600 text-xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold">הזמנת נסיעה חדשה</h2>
+            </div>
+            
+            <form id="tripForm" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-car-side ml-2"></i>בחירת רכב
+                        </label>
+                        <select name="vehicle" required
+                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-shadow">
+                            <option value="">בחר רכב</option>
+                            <option value="car1">טויוטה קורולה - 12-345-67</option>
+                            <option value="car2">יונדאי i35 - 23-456-78</option>
+                            <option value="car3">סקודה אוקטביה - 34-567-89</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar-alt ml-2"></i>תאריך ושעה
+                        </label>
+                        <input type="datetime-local" name="date_time" required
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-shadow">
+                    </div>
+                </div>
+
+<!-- במקום שדה מטרת הנסיעה הישן -->
+<div class="grid grid-cols-1 gap-6">
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+            <i class="fas fa-bullseye ml-2"></i>מטרת הנסיעה
+        </label>
+        <textarea name="purpose" rows="2" required
+                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-shadow"
+                  placeholder="פרט את מטרת הנסיעה..."></textarea>
+    </div>
+    
+    <div>
+        <label class="block text-sm font-medium text-gray-700 mb-2">
+            <i class="fas fa-map-marker-alt ml-2"></i>יעד הנסיעה
+        </label>
+        <textarea name="destination" rows="2" required
+                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-shadow"
+                  placeholder="פרט את יעד הנסיעה..."></textarea>
+    </div>
+</div>
+
+                <button type="submit" 
+                        class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition-all transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 flex items-center justify-center gap-2">
+                    <i class="fas fa-paper-plane"></i>
+                    שלח בקשה
+                </button>
+            </form>
+        </div>
+
+        <!-- Trips History -->
+        <div class="glass-effect rounded-2xl shadow-lg p-8">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="bg-indigo-100 p-3 rounded-lg">
+                    <i class="fas fa-history text-indigo-600 text-xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold">היסטוריית נסיעות</h2>
+            </div>
+            <div id="tripsContainer" class="space-y-4">
+                <!-- הנסיעות יוכנסו כאן דינמית -->
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // קבוע למיפוי רכבים
+        const VEHICLES = {
+            'car1': 'טויוטה קורולה - 12-345-67',
+            'car2': 'יונדאי i35 - 23-456-78',
+            'car3': 'סקודה אוקטביה - 34-567-89'
+        };
+
+        // Handle form submission
+        document.getElementById('tripForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalContent = submitButton.innerHTML;
+            
+            try {
+                submitButton.disabled = true;
+                submitButton.innerHTML = `
+                    <div class="flex items-center justify-center">
+                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span class="mr-2">שולח...</span>
+                    </div>
+                `;
+
+                const formData = new FormData(this);
+                const response = await fetch('/driver/submit_trip', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showNotification('הנסיעה נוספה בהצלחה', 'success');
+                    this.reset();
+                    loadTrips();
+                } else {
+                    throw new Error(data.message || 'אירעה שגיאה בשליחת הבקשה');
+                }
+            } catch (error) {
+                showNotification(error.message, 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalContent;
+            }
+        });
+
+        // Load trips function
+        async function loadTrips() {
+            const container = document.getElementById('tripsContainer');
+            
+            try {
+                const response = await fetch('/driver/get_trips');
+                const data = await response.json();
+                
+                if (!Array.isArray(data)) {
+                    throw new Error('התקבל מידע לא תקין מהשרת');
+                }
+
+                container.innerHTML = data.map((trip, index) => `
+    <div class="trip-card glass-effect rounded-xl p-6 fade-in" style="animation-delay: ${index * 0.1}s">
+        <div class="flex justify-between items-start">
+            <div class="space-y-3">
+                <div class="flex items-center gap-2">
+                    <div class="bg-blue-100 p-2 rounded">
+                        <i class="fas fa-car-side text-blue-600"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-lg">${VEHICLES[trip.vehicle] || trip.vehicle}</div>
+                        <div class="text-gray-500 text-sm">${formatDateTime(trip.date_time)}</div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-lg space-y-2">
+                    <div>
+                        <span class="font-medium text-gray-700">מטרת הנסיעה:</span>
+                        <div class="text-gray-600">${trip.purpose}</div>
+                    </div>
+                    <div>
+                        <span class="font-medium text-gray-700">יעד הנסיעה:</span>
+                        <div class="text-gray-600">${trip.destination || 'לא צוין'}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col items-end gap-2">
+                <div class="status-badge px-4 py-2 rounded-full text-sm font-medium ${getStatusBadgeClass(trip.status)}">
+                    ${getStatusIcon(trip.status)}
+                    <span class="mr-1">${getStatusText(trip.status)}</span>
+                </div>
+                ${trip.created_at ? `
+                    <div class="text-xs text-gray-400">
+                        <i class="far fa-clock ml-1"></i>
+                        נוצר ב-${formatDateTime(trip.created_at)}
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+        ${trip.rejection_reason ? `
+            <div class="mt-4 bg-red-50 p-4 rounded-lg border border-red-100">
+                <div class="flex items-center gap-2 text-red-600">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span class="font-medium">סיבת דחייה:</span>
+                </div>
+                <div class="mt-1 text-red-600">${trip.rejection_reason}</div>
+            </div>
+        ` : ''}
+    </div>
+`).join('') || '<div class="text-center text-gray-500 py-8">אין נסיעות להצגה</div>';
+            } catch (error) {
+                console.error('Error loading trips:', error);
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="bg-red-100 text-red-600 p-4 rounded-lg inline-flex items-center gap-2">
+                            <i class="fas fa-exclamation-circle"></i>
+                            אירעה שגיאה בטעינת הנסיעות
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Show notification function
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification fixed top-4 left-4 p-4 rounded-lg shadow-lg z-50 flex items-center gap-3
+                ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+            
+            notification.innerHTML = `
+                <div class="${type === 'success' ? 'bg-green-200' : 'bg-red-200'} p-2 rounded">
+                    <i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}-circle"></i>
+                </div>
+                <div class="font-medium">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.style.transition = 'all 0.5s ease-out';
+                notification.style.transform = 'translateX(-100%)';
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
+
+        // Helper functions
+        function formatDateTime(dateStr) {
+            const date = new Date(dateStr);
+            return new Intl.DateTimeFormat('he-IL', {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+            }).format(date);
+        }
+
+        function getStatusBadgeClass(status) {
+            return {
+                'pending': 'bg-yellow-100 text-yellow-800',
+                'approved': 'bg-green-100 text-green-800',
+                'rejected': 'bg-red-100 text-red-800'
+            }[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        function getStatusIcon(status) {
+            return {
+                'pending': '<i class="fas fa-clock"></i>',
+                'approved': '<i class="fas fa-check"></i>',
+                'rejected': '<i class="fas fa-times"></i>'
+            }[status] || '<i class="fas fa-question"></i>';
+        }
+
+        function getStatusText(status) {
+    return {
+        'pending': 'ממתין לאישור',
+        'approved': 'מאושר',
+        'rejected': 'נדחה'
+    }[status] || status;
+}
+
+// Load trips on page load
+document.addEventListener('DOMContentLoaded', loadTrips);
+</script>
+</body>
+</html>

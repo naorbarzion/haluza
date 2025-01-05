@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>דוחות נסיעות - Tracer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FullCalendar -->
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <!-- Flatpickr -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/he.js"></script>
+
+    <style>
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+/* FullCalendar Custom Styles */
+.fc {
+    direction: rtl;
+    text-align: right;
+}
+
+.fc-event {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 2px 4px;
+    margin-bottom: 2px;
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.75rem;
+    line-height: 1rem;
+}
+
+.fc-event:hover {
+    transform: scale(1.02);
+}
+
+.fc-event.pending {
+    background-color: #fbbf24 !important;
+    border-color: #d97706 !important;
+    color: #000000 !important;
+}
+
+.fc-event.approved {
+    background-color: #34d399 !important;
+    border-color: #059669 !important;
+    color: #000000 !important;
+}
+
+.fc-event.rejected {
+    background-color: #f87171 !important;
+    border-color: #dc2626 !important;
+    color: #000000 !important;
+}
+
+.fc-header-toolbar {
+    margin-bottom: 1.5em !important;
+}
+
+.fc-button {
+    background-color: #3b82f6 !important;
+    border-color: #2563eb !important;
+}
+
+.fc-button:hover {
+    background-color: #2563eb !important;
+    border-color: #1d4ed8 !important;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+    </style>
+</head>
+<body>
+<!-- המשך מההודעה הקודמת -->
+<body>
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <!-- Logo -->
+                <img src="https://tracer.co.il/wp-content/uploads/elementor/thumbs/Logo-H-p8d906f0bmrgobnn9uwquzibery89mtbvr1plpc910.png" 
+                     alt="Tracer Logo" 
+                     class="h-12">
+                
+                <div class="flex items-center gap-4">
+                    <div class="text-lg font-medium text-gray-700">
+                        <i class="fas fa-user-shield text-blue-600 ml-2"></i>
+                        <span>{{ full_name }}</span>
+                    </div>
+                    <a href="{{ url_for('admin_dashboard') }}" 
+                       class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                        <i class="fas fa-arrow-right"></i>
+                        חזרה לדשבורד
+                    </a>
+                    <a href="{{ url_for('logout') }}" 
+                       class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2">
+                        <i class="fas fa-sign-out-alt"></i>
+                        התנתק
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Filters Section -->
+        <div class="glass-effect rounded-2xl shadow-lg p-8 mb-8 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="bg-blue-100 p-3 rounded-lg">
+                    <i class="fas fa-filter text-blue-600 text-xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold">סינון והורדת דוחות</h2>
+            </div>
+
+            <form id="filterForm" class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-calendar ml-2"></i>מתאריך
+                    </label>
+                    <input type="text" id="dateFrom" placeholder="בחר תאריך התחלה" 
+                           class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-calendar ml-2"></i>עד תאריך
+                    </label>
+                    <input type="text" id="dateTo" placeholder="בחר תאריך סיום"
+                           class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-user ml-2"></i>בחירת נהג
+                    </label>
+                    <select id="driverSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">כל הנהגים</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-check-circle ml-2"></i>סטטוס
+                    </label>
+                    <select id="statusSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">כל הסטטוסים</option>
+                        <option value="pending">ממתין לאישור</option>
+                        <option value="approved">מאושר</option>
+                        <option value="rejected">נדחה</option>
+                    </select>
+                </div>
+            </form>
+
+            <div class="flex justify-between mt-6">
+                <button id="searchBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                    <i class="fas fa-search"></i>
+                    חפש
+                </button>
+                <button id="exportBtn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
+                    <i class="fas fa-file-excel"></i>
+                    ייצא לאקסל
+                </button>
+            </div>
+        </div>
+
+        <!-- Calendar Section -->
+        <div class="glass-effect rounded-2xl shadow-lg p-8 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="bg-indigo-100 p-3 rounded-lg">
+                    <i class="fas fa-calendar-alt text-indigo-600 text-xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold">לוח נסיעות</h2>
+            </div>
+
+            <div id="calendar" class="bg-white rounded-lg p-4"></div>
+        </div>
+    </main>
+
+<!-- Event Details Modal -->
+<div id="eventModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl p-6 max-w-lg w-full mx-4">
+        <div class="flex justify-between items-start mb-4">
+            <h3 class="text-xl font-bold" id="modalTitle"></h3>
+            <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="modalContent" class="space-y-4"></div>
+        <div class="mt-6 flex justify-end">
+            <button onclick="closeModal()" 
+                    class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors">
+                סגור
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let calendar;
+
+    // אתחול הקלנדר והפילטרים
+    document.addEventListener('DOMContentLoaded', function() {
+        // אתחול בחירת תאריכים
+        flatpickr("#dateFrom, #dateTo", {
+            locale: "he",
+            dateFormat: "Y-m-d",
+            enableTime: false
+        });
+
+        // אתחול הקלנדר
+        const calendarEl = document.getElementById('calendar');
+        calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            direction: 'rtl',
+            locale: 'he',
+            headerToolbar: {
+                right: 'prev,next today',
+                center: 'title',
+                left: 'dayGridMonth,timeGridWeek,timeGridDay'
+            },
+            buttonText: {
+                today: 'היום',
+                month: 'חודש',
+                week: 'שבוע',
+                day: 'יום'
+            },
+            views: {
+                dayGrid: {
+                    titleFormat: { year: 'numeric', month: 'long' }
+                },
+                timeGrid: {
+                    dayHeaderFormat: { weekday: 'long' }
+                }
+            },
+            firstDay: 0,
+            nowIndicator: true,
+            eventClick: function(info) {
+                showEventDetails(info.event);
+            },
+            eventContent: function(arg) {
+                return {
+                    html: `
+                        <div class="p-1">
+                            <div class="text-xs font-bold">${formatTime(arg.event.start)}</div>
+                            <div class="text-xs">${arg.event.title}</div>
+                        </div>
+                    `
+                };
+            },
+            eventClassNames: function(arg) {
+                return [arg.event.extendedProps.status];
+            }
+        });
+        
+        calendar.render();
+        loadDrivers();
+        searchTrips();
+    });
+
+    // טעינת נהגים
+    async function loadDrivers() {
+        try {
+            const response = await fetch('/admin/get_drivers');
+            const drivers = await response.json();
+            const select = document.getElementById('driverSelect');
+            
+            drivers.forEach(driver => {
+                const option = document.createElement('option');
+                option.value = driver.id;
+                option.textContent = driver.full_name;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading drivers:', error);
+            showNotification('שגיאה בטעינת רשימת הנהגים', 'error');
+        }
+    }
+
+    // חיפוש והצגת נסיעות
+    async function searchTrips() {
+        try {
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            const driverId = document.getElementById('driverSelect').value;
+            const status = document.getElementById('statusSelect').value;
+
+            const response = await fetch('/admin/search_trips', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    date_from: dateFrom,
+                    date_to: dateTo,
+                    driver_id: driverId,
+                    status: status
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('שגיאה בטעינת הנסיעות');
+            }
+
+            const trips = await response.json();
+            updateCalendar(trips);
+        } catch (error) {
+            console.error('Error searching trips:', error);
+            showNotification('שגיאה בחיפוש הנסיעות', 'error');
+        }
+    }
+
+    // עדכון הקלנדר
+    function updateCalendar(trips) {
+        calendar.removeAllEvents();
+        
+        const events = trips.map(trip => ({
+            id: trip.id,
+            title: `${trip.driver_name} - ${getVehicleName(trip.vehicle)}`,
+            start: trip.date_time,
+            allDay: false,
+            status: trip.status,
+            extendedProps: {
+                ...trip,
+                vehicleName: getVehicleName(trip.vehicle)
+            }
+        }));
+        
+        calendar.addEventSource(events);
+    }
+
+    // הצגת פרטי נסיעה
+    function showEventDetails(event) {
+        const modal = document.getElementById('eventModal');
+        const title = document.getElementById('modalTitle');
+        const content = document.getElementById('modalContent');
+        
+        title.textContent = 'פרטי נסיעה';
+        content.innerHTML = `
+            <div class="space-y-3">
+                <p><strong>נהג:</strong> ${event.extendedProps.driver_name}</p>
+                <p><strong>רכב:</strong> ${event.extendedProps.vehicleName}</p>
+                <p><strong>תאריך ושעה:</strong> ${formatDateTime(event.start)}</p>
+                <p><strong>מטרה:</strong> ${event.extendedProps.purpose}</p>
+                <p><strong>יעד:</strong> ${event.extendedProps.destination || 'לא צוין'}</p>
+                <p><strong>סטטוס:</strong> 
+                    <span class="px-2 py-1 rounded-full text-sm font-medium ${getStatusBadgeClass(event.extendedProps.status)}">
+                        ${getStatusText(event.extendedProps.status)}
+                    </span>
+                </p>
+                ${event.extendedProps.rejection_reason ? `
+                    <div class="mt-2 p-3 bg-red-50 text-red-700 rounded-lg">
+                        <strong>סיבת דחייה:</strong> ${event.extendedProps.rejection_reason}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        
+        modal.classList.remove('hidden');
+    }
+
+    // סגירת המודל
+    function closeModal() {
+        document.getElementById('eventModal').classList.add('hidden');
+    }
+
+    // ייצוא לאקסל
+    async function exportToExcel() {
+        try {
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            const driverId = document.getElementById('driverSelect').value;
+            const status = document.getElementById('statusSelect').value;
+
+            const response = await fetch('/admin/export_trips', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    date_from: dateFrom,
+                    date_to: dateTo,
+                    driver_id: driverId,
+                    status: status
+                })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `דוח_נסיעות_${formatDateForFilename(new Date())}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                showNotification('הדוח הורד בהצלחה', 'success');
+            } else {
+                throw new Error('Failed to export');
+            }
+        } catch (error) {
+            console.error('Error exporting trips:', error);
+            showNotification('שגיאה בייצוא הדוח', 'error');
+        }
+    }
+
+    // Helper Functions
+    function getVehicleName(vehicleCode) {
+        const vehicles = {
+            'car1': 'טויוטה קורולה - 12-345-67',
+            'car2': 'יונדאי i35 - 23-456-78',
+            'car3': 'סקודה אוקטביה - 34-567-89'
+        };
+        return vehicles[vehicleCode] || vehicleCode;
+    }
+
+    function getStatusBadgeClass(status) {
+        return {
+            'pending': 'bg-yellow-100 text-yellow-800',
+            'approved': 'bg-green-100 text-green-800',
+            'rejected': 'bg-red-100 text-red-800'
+        }[status] || 'bg-gray-100 text-gray-800';
+    }
+
+    function getStatusText(status) {
+        return {
+            'pending': 'ממתין לאישור',
+            'approved': 'מאושר',
+            'rejected': 'נדחה'
+        }[status] || status;
+    }
+
+    function formatDateTime(date) {
+        return new Intl.DateTimeFormat('he-IL', {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        }).format(date);
+    }
+
+    function formatTime(date) {
+        return new Intl.DateTimeFormat('he-IL', {
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(date);
+    }
+
+    function formatDateForFilename(date) {
+        return date.toISOString().split('T')[0];
+    }
+
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `fixed top-4 left-4 p-4 rounded-lg shadow-lg z-50 fade-in ${
+            type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        }`;
+        
+        notification.innerHTML = `
+            <div class="flex items-center gap-2">
+                <i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}-circle"></i>
+                ${message}
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+    }
+
+    // Event Listeners
+    document.getElementById('searchBtn').addEventListener('click', searchTrips);
+    document.getElementById('exportBtn').addEventListener('click', exportToExcel);
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('eventModal');
+        if (event.target === modal) {
+            closeModal();
+        }
+    }
+</script>
+</body>
+</html>
