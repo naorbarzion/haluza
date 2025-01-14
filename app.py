@@ -548,6 +548,8 @@ def admin_get_trips():
         for trip in trips:
             trip['_id'] = str(trip['_id'])
             trip['user_id'] = str(trip['user_id'])
+            if 'admin_id' in trip:
+                trip['admin_id'] = str(trip['admin_id'])
             driver = db.users.find_one({'_id': ObjectId(trip['user_id'])})
             trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
             # הסרת שדה עזר
