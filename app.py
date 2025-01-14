@@ -82,13 +82,13 @@ def create_default_users():
             {
                 'username': 'admin',
                 'password': generate_password_hash('admin'),
-                'full_name': 'מנהל ראשי',
+                'full_name': 'הנהלת מוסדות אסף',
                 'role': 'admin'
             },
             {
                 'username': 'admin2',
                 'password': generate_password_hash('1234'),
-                'full_name': 'מנהל משנה',
+                'full_name': 'הנהלת מוסדות שירי',
                 'role': 'admin'
             }
         ]
@@ -99,22 +99,20 @@ def create_default_users():
         
         # משתמשי נהגים
         drivers = [
-            {'username': 'driver1', 'password': generate_password_hash('1234'), 'full_name': 'משה כהן', 'role': 'driver'},
-            {'username': 'driver2', 'password': generate_password_hash('1234'), 'full_name': 'יוסי לוי', 'role': 'driver'},
-            {'username': 'driver3', 'password': generate_password_hash('1234'), 'full_name': 'דוד כהן', 'role': 'driver'},
-            {'username': 'driver4', 'password': generate_password_hash('1234'), 'full_name': 'יעקב אברהם', 'role': 'driver'},
-            {'username': 'driver5', 'password': generate_password_hash('1234'), 'full_name': 'דניאל דוד', 'role': 'driver'},
-            {'username': 'driver6', 'password': generate_password_hash('1234'), 'full_name': 'אברהם יצחק', 'role': 'driver'},
-            {'username': 'driver7', 'password': generate_password_hash('1234'), 'full_name': 'יצחק משה', 'role': 'driver'},
-            {'username': 'driver8', 'password': generate_password_hash('1234'), 'full_name': 'שמואל שלום', 'role': 'driver'},
-            {'username': 'driver9', 'password': generate_password_hash('1234'), 'full_name': 'אהרון הכהן', 'role': 'driver'},
-            {'username': 'driver10', 'password': generate_password_hash('1234'), 'full_name': 'מאיר דוד', 'role': 'driver'},
-            {'username': 'driver11', 'password': generate_password_hash('1234'), 'full_name': 'חיים כהן', 'role': 'driver'},
-            {'username': 'driver12', 'password': generate_password_hash('1234'), 'full_name': 'יונתן לוי', 'role': 'driver'},
-            {'username': 'driver13', 'password': generate_password_hash('1234'), 'full_name': 'אליהו הנביא', 'role': 'driver'},
-            {'username': 'driver14', 'password': generate_password_hash('1234'), 'full_name': 'שלמה המלך', 'role': 'driver'},
-            {'username': 'driver15', 'password': generate_password_hash('1234'), 'full_name': 'דן הגיבור', 'role': 'driver'},
-            {'username': 'driver16', 'password': generate_password_hash('1234'), 'full_name': 'גד החוזה', 'role': 'driver'}
+            {'username': 'moriel', 'password': generate_password_hash('3278'), 'full_name': 'חלוצית 4 - מוריאל', 'role': 'driver'},
+            {'username': 'doron', 'password': generate_password_hash('4521'), 'full_name': 'תלמוד תורה - דורון ותקין', 'role': 'driver'},
+            {'username': 'haravneria', 'password': generate_password_hash('8394'), 'full_name': 'תלמוד תורה - הרב נריה', 'role': 'driver'},
+            {'username': 'israel', 'password': generate_password_hash('6710'), 'full_name': 'תיכונית - ישראל רובינשטיין', 'role': 'driver'},
+            {'username': 'elad', 'password': generate_password_hash('5924'), 'full_name': 'תיכונית - אלעד בסטיקר', 'role': 'driver'},
+            {'username': 'haravasaf', 'password': generate_password_hash('3187'), 'full_name': 'תיכונית - הרב אסף נאומבורג', 'role': 'driver'},
+            {'username': 'natanel', 'password': generate_password_hash('4209'), 'full_name': 'חלוצי דרור - נתנאל שכטר', 'role': 'driver'},
+            {'username': 'anat', 'password': generate_password_hash('7536'), 'full_name': 'אולפנא - ענת', 'role': 'driver'},
+            {'username': 'yosef', 'password': generate_password_hash('9841'), 'full_name': 'אולפנא - יוסף', 'role': 'driver'},
+            {'username': 'haravyossi', 'password': generate_password_hash('2648'), 'full_name': 'ישיבה קטנה - הרב יוסי וייסברג', 'role': 'driver'},
+            {'username': 'barak', 'password': generate_password_hash('8307'), 'full_name': 'ישיבה גבוהה - ברק שיטרית', 'role': 'driver'},
+            {'username': 'shimon', 'password': generate_password_hash('6752'), 'full_name': 'מטבח - שמעון ג\'רבי', 'role': 'driver'},
+            {'username': 'orly', 'password': generate_password_hash('9435'), 'full_name': 'בית ספר לבנות - אורלי', 'role': 'driver'},
+            {'username': 'tamiravichai', 'password': generate_password_hash('5076'), 'full_name': 'תחזוקה - תמיר או אביחי', 'role': 'driver'}
         ]
         
         # הוספת משתמשי נהגים
@@ -122,7 +120,7 @@ def create_default_users():
         logger.info(f"Added {len(result.inserted_ids)} driver users")
         
         # יצירת נסיעה לדוגמה
-        example_driver = db.users.find_one({'username': 'driver1'})
+        example_driver = db.users.find_one({'username': 'moriel'})
         if example_driver:
             example_trip = {
                 'user_id': example_driver['_id'],
