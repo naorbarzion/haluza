@@ -640,5 +640,76 @@ def reschedule_trip():
             "message": f"שגיאה בעדכון מועד הנסיעה: {str(e)}"
         }), 500
 
+@app.route('/admin/add_trip', methods=['POST'])
+@login_required
+@admin_required
+def admin_add_trip():
+    try:
+        data = request.json
+        logger.info(f"Admin adding trip with data: {data}")
+        
+        # בדיקת תקינות הנתונים
+        required_fields = ['driver_id', 'vehicle', 'date_time', 'purpose', 'destination']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({
+                    "status": "error",
+                    "message": f"שדה חובה חסר: {field}"
+                }), 400
+
+        # המרת מזהה הנהג ל-ObjectId
+        try:
+            driver_id = ObjectId(data['driver_id'])
+        except Exception as e:
+            logger.error(f"Invalid driver_id format: {e}")
+            return jsonify({"status": "error", "message": "מזהה נהג לא תקין"}), 400
+
+        # בדיקה שהנהג קיים
+        driver = db.users.find_one({'_id': driver_id, 'role': 'driver'})
+        if not driver:
+            return jsonify({"status": "error", "message": "הנהג לא נמצא"}), 404
+
+        # יצירת הנסיעה
+        trip = {
+            'user_id': driver_id,
+            'vehicle': data['vehicle'],
+            'date_time': data['date_time'],
+            'purpose': data['purpose'],
+            'destination': data['destination'],
+            'status': 'approved',  # נסיעות שהאדמין מוסיף מאושרות אוטומטית
+            'created_at': datetime.utcnow(),
+            'added_by_admin': True,  # סימון שהנסיעה נוספה על ידי אדמין
+            'admin_id': ObjectId(session['user_id'])  # שמירת מזהה האדמין שהוסיף
+        }
+
+        result = db.trips.insert_one(trip)
+        
+        # הכנת אובייקט התגובה
+        response_trip = {
+            '_id': str(result.inserted_id),
+            'user_id': str(trip['user_id']),
+            'vehicle': trip['vehicle'],
+            'date_time': trip['date_time'],
+            'purpose': trip['purpose'],
+            'destination': trip['destination'],
+            'status': trip['status'],
+            'created_at': trip['created_at'].isoformat(),
+            'driver_name': driver['full_name']
+        }
+        
+        logger.info(f"Successfully added trip for driver {driver['full_name']}")
+        return jsonify({
+            "status": "success",
+            "message": "הנסיעה נוספה בהצלחה",
+            "trip": response_trip
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in admin_add_trip: {str(e)}")
+        return jsonify({
+            "status": "error", 
+            "message": f"שגיאה בהוספת הנסיעה: {str(e)}"
+        }), 500
+
 if __name__ == '__main__':
     app.run(debug=False)  # שינוי ל-False בסביבת ייצור
