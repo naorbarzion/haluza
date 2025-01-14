@@ -226,6 +226,92 @@
         </div>
     </div>
 
+    <!-- Add Trip Modal -->
+    <div id="addTripModal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="fixed inset-0 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold">הוספת נסיעה חדשה</h3>
+                    <button onclick="closeAddTripModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <form id="addTripForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-user ml-2"></i>בחירת נהג
+                        </label>
+                        <select id="driverSelect" required
+                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">בחר נהג</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-car-side ml-2"></i>בחירת רכב
+                        </label>
+                        <select name="vehicle" required
+                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">בחר רכב</option>
+                            <option value="car1">טויוטה קורולה - 12-345-67</option>
+                            <option value="car2">יונדאי i35 - 23-456-78</option>
+                            <option value="car3">סקודה אוקטביה - 34-567-89</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar-alt ml-2"></i>תאריך ושעה
+                        </label>
+                        <input type="datetime-local" name="date_time" required
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-bullseye ml-2"></i>מטרת הנסיעה
+                        </label>
+                        <textarea name="purpose" rows="2" required
+                                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="פרט את מטרת הנסיעה..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-map-marker-alt ml-2"></i>יעד הנסיעה
+                        </label>
+                        <textarea name="destination" rows="2" required
+                                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="פרט את יעד הנסיעה..."></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-4 mt-6">
+                        <button type="button" 
+                                onclick="closeAddTripModal()"
+                                class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                            ביטול
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
+                            הוסף נסיעה
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Trip Button -->
+    <div class="fixed bottom-8 left-8">
+        <button onclick="showAddTripModal()" 
+                class="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors">
+            <i class="fas fa-plus text-xl"></i>
+        </button>
+    </div>
+
     <script>
         const VEHICLES = {
             'car1': 'טויוטה קורולה - 12-345-67',
@@ -458,6 +544,88 @@
 
         // Load trips on page load
         document.addEventListener('DOMContentLoaded', loadTrips);
+
+        // Add Trip Modal Functions
+        function showAddTripModal() {
+            document.getElementById('addTripModal').classList.remove('hidden');
+            loadDriversForSelect();
+        }
+
+        function closeAddTripModal() {
+            document.getElementById('addTripModal').classList.add('hidden');
+            document.getElementById('addTripForm').reset();
+        }
+
+        async function loadDriversForSelect() {
+            try {
+                const response = await fetch('/admin/get_drivers');
+                const drivers = await response.json();
+                const select = document.getElementById('driverSelect');
+                
+                // נקה אפשרויות קיימות
+                select.innerHTML = '<option value="">בחר נהג</option>';
+                
+                // הוסף את הנהגים
+                drivers.forEach(driver => {
+                    const option = document.createElement('option');
+                    option.value = driver.id;
+                    option.textContent = driver.full_name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading drivers:', error);
+                showNotification('שגיאה בטעינת רשימת הנהגים', 'error');
+            }
+        }
+
+        // Add Trip Form Submission
+        document.getElementById('addTripForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalContent = submitButton.innerHTML;
+            
+            try {
+                submitButton.disabled = true;
+                submitButton.innerHTML = `
+                    <div class="flex items-center justify-center">
+                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span class="mr-2">מוסיף...</span>
+                    </div>
+                `;
+
+                const formData = new FormData(this);
+                const data = {
+                    driver_id: document.getElementById('driverSelect').value,
+                    vehicle: formData.get('vehicle'),
+                    date_time: formData.get('date_time'),
+                    purpose: formData.get('purpose'),
+                    destination: formData.get('destination')
+                };
+
+                const response = await fetch('/admin/add_trip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('הנסיעה נוספה בהצלחה', 'success');
+                    closeAddTripModal();
+                    loadTrips();  // רענון רשימת הנסיעות
+                } else {
+                    throw new Error(result.message || 'אירעה שגיאה בהוספת הנסיעה');
+                }
+            } catch (error) {
+                showNotification(error.message, 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalContent;
+            }
+        });
     </script>
 </body>
 </html>
