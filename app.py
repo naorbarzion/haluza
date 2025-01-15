@@ -725,34 +725,47 @@ def admin_add_trip():
         data = request.json
         logger.info(f"Admin adding trip with data: {data}")
         
-        # בדיקת תקינות הנתונים
-        required_fields = ['driver_id', 'vehicle', 'date_time', 'purpose', 'destination']
-        for field in required_fields:
-            if not data.get(field):
+        # בדיקה שכל השדות הנדרשים קיימים
+        required_fields = ['driver_id', 'vehicle', 'date_time', 'end_time', 'purpose']
+        if not all(field in data for field in required_fields):
+            return jsonify({
+                "status": "error",
+                "message": "חסרים שדות חובה"
+            }), 400
+        
+        # המרת תאריכים
+        try:
+            start_time = datetime.fromisoformat(data['date_time'])
+            end_time = datetime.fromisoformat(data['end_time'])
+            
+            # ולידציה של התאריכים
+            if end_time <= start_time:
                 return jsonify({
                     "status": "error",
-                    "message": f"שדה חובה חסר: {field}"
+                    "message": "שעת הסיום חייבת להיות מאוחרת משעת ההתחלה"
                 }), 400
-
-        # המרת מזהה הנהג ל-ObjectId
-        try:
-            driver_id = ObjectId(data['driver_id'])
-        except Exception as e:
-            logger.error(f"Invalid driver_id format: {e}")
-            return jsonify({"status": "error", "message": "מזהה נהג לא תקין"}), 400
-
+        except ValueError as e:
+            return jsonify({
+                "status": "error",
+                "message": "פורמט תאריך לא תקין"
+            }), 400
+        
         # בדיקה שהנהג קיים
-        driver = db.users.find_one({'_id': driver_id, 'role': 'driver'})
+        driver = db.users.find_one({'_id': ObjectId(data['driver_id'])})
         if not driver:
-            return jsonify({"status": "error", "message": "הנהג לא נמצא"}), 404
-
+            return jsonify({
+                "status": "error",
+                "message": "הנהג לא נמצא במערכת"
+            }), 404
+        
         # יצירת הנסיעה
         trip = {
-            'user_id': driver_id,
+            'user_id': ObjectId(data['driver_id']),
             'vehicle': data['vehicle'],
-            'date_time': data['date_time'],
+            'date_time': start_time,
+            'end_time': end_time,
             'purpose': data['purpose'],
-            'destination': data['destination'],
+            'destination': data.get('destination', ''),
             'status': 'approved',  # נסיעות שהאדמין מוסיף מאושרות אוטומטית
             'created_at': datetime.utcnow(),
             'added_by_admin': True,  # סימון שהנסיעה נוספה על ידי אדמין
@@ -766,7 +779,8 @@ def admin_add_trip():
             '_id': str(result.inserted_id),
             'user_id': str(trip['user_id']),
             'vehicle': trip['vehicle'],
-            'date_time': trip['date_time'],
+            'date_time': trip['date_time'].isoformat(),
+            'end_time': trip['end_time'].isoformat(),
             'purpose': trip['purpose'],
             'destination': trip['destination'],
             'status': trip['status'],
