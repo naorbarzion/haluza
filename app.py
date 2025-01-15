@@ -193,6 +193,9 @@ def login():
 def submit_trip():
     try:
         data = request.form
+        logger.info(f"Submitting trip with data: {data}")
+        
+        # המרת תאריכים
         start_time = datetime.fromisoformat(data['date_time'])
         end_time = datetime.fromisoformat(data['end_time'])
         
@@ -203,32 +206,35 @@ def submit_trip():
                 "message": "שעת הסיום חייבת להיות מאוחרת משעת ההתחלה"
             }), 400
         
+        # יצירת הנסיעה עם הפורמט הנכון
         trip = {
             'user_id': ObjectId(session['user_id']),
             'vehicle': data['vehicle'],
-            'date_time': data['date_time'],
-            'end_time': data['end_time'],
+            'date_time': start_time,  # שמירה כאובייקט datetime
+            'end_time': end_time,     # שמירה כאובייקט datetime
             'purpose': data['purpose'],
             'destination': data['destination'],
             'status': 'pending',
             'created_at': datetime.utcnow()
         }
         
+        logger.info(f"Formatted trip data: {trip}")
         result = db.trips.insert_one(trip)
         
-        # המרת ObjectId למחרוזת לפני החזרה
+        # המרת ObjectId ותאריכים למחרוזות לפני החזרה
         trip_response = {
             '_id': str(result.inserted_id),
             'user_id': str(trip['user_id']),
             'vehicle': trip['vehicle'],
-            'date_time': trip['date_time'],
-            'end_time': trip['end_time'],
+            'date_time': trip['date_time'].isoformat(),
+            'end_time': trip['end_time'].isoformat(),
             'purpose': trip['purpose'],
             'destination': trip['destination'],
             'status': trip['status'],
             'created_at': trip['created_at'].isoformat()
         }
         
+        logger.info(f"Trip submitted successfully: {trip_response}")
         return jsonify({
             "status": "success",
             "message": "הנסיעה נוספה בהצלחה",
@@ -241,26 +247,49 @@ def submit_trip():
 
 @app.route('/driver/get_trips')
 @login_required
-def driver_get_trips():
+def get_driver_trips():
     try:
-        # שליפת כל הנסיעות של הנהג
-        trips = list(db.trips.find(
-            {'user_id': ObjectId(session['user_id'])}
-        ).sort('created_at', -1))
+        # נוסיף לוגים לדיבוג
+        logger.info(f"Fetching trips for driver ID: {session['user_id']}")
         
-        # המרת ObjectId למחרוזת
-        for trip in trips:
-            trip['_id'] = str(trip['_id'])
-            trip['user_id'] = str(trip['user_id'])
-            # המרת תאריכים למחרוזות
-            if 'created_at' in trip and isinstance(trip['created_at'], datetime):
-                trip['created_at'] = trip['created_at'].isoformat()
+        # בדיקת הפורמט של user_id בשאילתה
+        user_id = ObjectId(session['user_id'])
+        logger.info(f"Converted user_id to ObjectId: {user_id}")
         
-        logger.info(f"Retrieved {len(trips)} trips for driver {session['user_id']}")
-        return jsonify(trips)
+        # נבדוק קודם אילו נסיעות קיימות עבור המשתמש
+        all_trips = list(db.trips.find({'user_id': user_id}))
+        logger.info(f"Found {len(all_trips)} trips for user")
+        
+        # נדפיס את הפרטים של כל נסיעה לבדיקה
+        for trip in all_trips:
+            logger.info(f"Trip details: {trip}")
+        
+        # עיבוד הנסיעות
+        processed_trips = []
+        for trip in all_trips:
+            processed_trip = {
+                '_id': str(trip['_id']),
+                'user_id': str(trip['user_id']),
+                'vehicle': trip['vehicle'],
+                'date_time': trip['date_time'].isoformat() if isinstance(trip['date_time'], datetime) else trip['date_time'],
+                'end_time': trip['end_time'].isoformat() if isinstance(trip['end_time'], datetime) else trip['end_time'],
+                'purpose': trip['purpose'],
+                'destination': trip.get('destination', ''),
+                'status': trip['status'],
+                'created_at': trip['created_at'].isoformat() if isinstance(trip['created_at'], datetime) else trip['created_at']
+            }
+            
+            # הוספת סיבת דחייה אם קיימת
+            if 'rejection_reason' in trip:
+                processed_trip['rejection_reason'] = trip['rejection_reason']
+                
+            processed_trips.append(processed_trip)
+            
+        logger.info(f"Processed {len(processed_trips)} trips successfully")
+        return jsonify(processed_trips)
         
     except Exception as e:
-        logger.error(f"Error in driver_get_trips: {str(e)}")
+        logger.error(f"Error in get_driver_trips: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/logout')
@@ -811,6 +840,62 @@ def reject_trip():
         
     except Exception as e:
         logger.error(f"Error in reject_trip: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/admin/fix_old_trips', methods=['POST'])
+@login_required
+@admin_required
+def fix_old_trips():
+    try:
+        # מצא את כל הנסיעות שהתאריכים שלהן במבנה מחרוזת
+        old_trips = db.trips.find({
+            '$or': [
+                {'date_time': {'$type': 'string'}},
+                {'end_time': {'$type': 'string'}},
+                {'created_at': {'$type': 'string'}}
+            ]
+        })
+        
+        fixed_count = 0
+        for trip in old_trips:
+            updates = {}
+            
+            # תיקון date_time
+            if isinstance(trip.get('date_time'), str):
+                try:
+                    updates['date_time'] = datetime.fromisoformat(trip['date_time'])
+                except:
+                    logger.error(f"Could not convert date_time for trip {trip['_id']}")
+            
+            # תיקון end_time
+            if isinstance(trip.get('end_time'), str):
+                try:
+                    updates['end_time'] = datetime.fromisoformat(trip['end_time'])
+                except:
+                    logger.error(f"Could not convert end_time for trip {trip['_id']}")
+            
+            # תיקון created_at
+            if isinstance(trip.get('created_at'), str):
+                try:
+                    updates['created_at'] = datetime.fromisoformat(trip['created_at'])
+                except:
+                    logger.error(f"Could not convert created_at for trip {trip['_id']}")
+            
+            if updates:
+                result = db.trips.update_one(
+                    {'_id': trip['_id']},
+                    {'$set': updates}
+                )
+                if result.modified_count > 0:
+                    fixed_count += 1
+        
+        return jsonify({
+            "status": "success",
+            "message": f"תוקנו {fixed_count} נסיעות ישנות"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fixing old trips: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
