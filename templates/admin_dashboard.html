@@ -204,10 +204,21 @@
                 <form id="rescheduleForm" class="space-y-4">
                     <input type="hidden" id="rescheduleTripId">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">מועד חדש</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-clock ml-2"></i>תאריך ושעת התחלה חדשים
+                        </label>
                         <input type="datetime-local" 
-                               id="newDateTime" 
-                               class="date-picker" 
+                               id="newStartTime" 
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                               required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-clock ml-2"></i>תאריך ושעת סיום חדשים
+                        </label>
+                        <input type="datetime-local" 
+                               id="newEndTime" 
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                                required>
                     </div>
                     <div class="flex justify-end gap-4">
@@ -227,53 +238,87 @@
     </div>
 
     <!-- Modal for adding new trip -->
-    <div class="modal fade" id="addTripModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">הוספת נסיעה חדשה</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div id="addTripModal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="fixed inset-0 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold">הוספת נסיעה חדשה</h3>
+                    <button onclick="closeAddTripModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
-                <div class="modal-body">
-                    <form id="adminAddTripForm">
-                        <div class="mb-3">
-                            <label class="form-label">נהג</label>
-                            <select class="form-select" name="driver_id" required>
-                                <option value="">בחר נהג</option>
-                                <!-- יתמלא דינמית -->
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">רכב</label>
-                            <select class="form-select" name="vehicle" required>
-                                <option value="">בחר רכב</option>
-                                <option value="car1">יונדאי איוניק - 53836402</option>
-                                <option value="car2">טויוטה סיטי - 15093804</option>
-                                <option value="car3">מרצדס בנץ - 19826603</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">תאריך ושעת התחלה</label>
-                            <input type="datetime-local" class="form-control" name="start_time" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">תאריך ושעת סיום</label>
-                            <input type="datetime-local" class="form-control" name="end_time" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">מטרת הנסיעה</label>
-                            <input type="text" class="form-control" name="purpose" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">יעד</label>
-                            <input type="text" class="form-control" name="destination" required>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
-                    <button type="button" class="btn btn-primary" onclick="submitAdminAddTrip()">הוסף נסיעה</button>
-                </div>
+                
+                <form id="addTripForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-user ml-2"></i>בחירת נהג
+                        </label>
+                        <select id="driverSelect" required
+                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">בחר נהג</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-car-side ml-2"></i>בחירת רכב
+                        </label>
+                        <select name="vehicle" required
+                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">בחר רכב</option>
+                            <option value="car1">יונדאי איוניק - 53836402</option>
+                            <option value="car2">טויוטה סיטי - 15093804</option>
+                            <option value="car3">מרצדס בנץ - 19826603</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-clock ml-2"></i>תאריך ושעת התחלה
+                        </label>
+                        <input type="datetime-local" name="start_time" required
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-clock ml-2"></i>תאריך ושעת סיום
+                        </label>
+                        <input type="datetime-local" name="end_time" required
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-bullseye ml-2"></i>מטרת הנסיעה
+                        </label>
+                        <textarea name="purpose" rows="2" required
+                                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="פרט את מטרת הנסיעה..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-map-marker-alt ml-2"></i>יעד הנסיעה
+                        </label>
+                        <textarea name="destination" rows="2" required
+                                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="פרט את יעד הנסיעה..."></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-4 mt-6">
+                        <button type="button" 
+                                onclick="closeAddTripModal()"
+                                class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                            ביטול
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
+                            הוסף נסיעה
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -326,7 +371,11 @@
                                 <div class="bg-gray-50 p-3 rounded-lg">
                                     <div class="text-sm text-gray-600">${trip.purpose}</div>
                                     <div class="mt-2 text-sm font-medium">
-                                        <i class="far fa-calendar ml-1"></i>${formatDateTime(trip.date_time)}
+                                        <div><i class="far fa-calendar ml-1"></i>התחלה: ${formatDateTime(trip.start_time)}</div>
+                                        <div><i class="far fa-calendar ml-1"></i>סיום: ${formatDateTime(trip.end_time)}</div>
+                                    </div>
+                                    <div class="mt-2 text-sm text-gray-600">
+                                        <i class="fas fa-map-marker-alt ml-1"></i>${trip.destination}
                                     </div>
                                 </div>
                             </div>
@@ -339,7 +388,7 @@
                                         class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">
                                     <i class="fas fa-times ml-1"></i>דחה
                                 </button>
-                                <button onclick="showRescheduleModal('${trip._id}', '${trip.date_time}')"
+                                <button onclick="showRescheduleModal('${trip._id}')"
                                         class="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
                                     <i class="fas fa-clock ml-1"></i>שנה מועד
                                 </button>
@@ -353,30 +402,33 @@
                     .filter(t => t.status === 'approved')
                     .sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
 
-                    document.getElementById('approvedTrips').innerHTML = approvedTrips.map((trip, index) => `
-    <div class="trip-card glass-card rounded-xl p-6 slide-in" style="animation-delay: ${index * 0.1}s">
-        <div class="flex justify-between items-center">
-            <div class="flex gap-4">
-                <div class="bg-green-100 p-2 rounded-lg">
-                    <i class="fas fa-check text-green-600"></i>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(trip.driver_name)}&background=random" 
-                             class="w-8 h-8 rounded-full">
-                        <div class="font-medium">${trip.driver_name}</div>
+                document.getElementById('approvedTrips').innerHTML = approvedTrips.map((trip, index) => `
+                    <div class="trip-card glass-card rounded-xl p-6 slide-in" style="animation-delay: ${index * 0.1}s">
+                        <div class="flex justify-between items-center">
+                            <div class="flex gap-4">
+                                <div class="bg-green-100 p-2 rounded-lg">
+                                    <i class="fas fa-check text-green-600"></i>
+                                </div>
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(trip.driver_name)}&background=random" 
+                                             class="w-8 h-8 rounded-full">
+                                        <div class="font-medium">${trip.driver_name}</div>
+                                    </div>
+                                    <div class="text-sm text-gray-500">${VEHICLES[trip.vehicle]}</div>
+                                    <div class="mt-2 text-sm text-gray-600">${trip.purpose}</div>
+                                    <div class="mt-1 text-sm text-gray-600">
+                                        <div><i class="far fa-calendar ml-1"></i>התחלה: ${formatDateTime(trip.start_time)}</div>
+                                        <div><i class="far fa-calendar ml-1"></i>סיום: ${formatDateTime(trip.end_time)}</div>
+                                    </div>
+                                    <div class="mt-1 text-sm text-gray-600">
+                                        <i class="fas fa-map-marker-alt ml-1"></i>${trip.destination}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="text-sm text-gray-500">${VEHICLES[trip.vehicle]}</div>
-                    <div class="mt-2 text-sm text-gray-600">${trip.purpose}</div>
-                </div>
-            </div>
-            <div class="text-sm text-gray-700">
-                <i class="far fa-calendar ml-1"></i>
-                ${formatDateTime(trip.date_time)}
-            </div>
-        </div>
-    </div>
-`).join('') || '<div class="text-center text-gray-500 py-8">אין נסיעות מאושרות</div>';
+                `).join('') || '<div class="text-center text-gray-500 py-8">אין נסיעות מאושרות</div>';
 
             } catch (error) {
                 console.error('Error loading trips:', error);
@@ -418,8 +470,25 @@
         }
 
         async function approveTrip(tripId) {
-            if (await updateTripStatus(tripId, 'approved')) {
-                alert('הנסיעה אושרה בהצלחה');
+            try {
+                const response = await fetch('/admin/approve_trip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ trip_id: tripId })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showNotification('הנסיעה אושרה בהצלחה', 'success');
+                    loadTrips();
+                } else {
+                    showNotification(data.message || 'אירעה שגיאה באישור הנסיעה', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('אירעה שגיאה באישור הנסיעה', 'error');
             }
         }
 
@@ -439,16 +508,40 @@
             const tripId = document.getElementById('rejectTripId').value;
             const rejectionReason = document.getElementById('rejectionReason').value;
             
-            if (await updateTripStatus(tripId, 'rejected', rejectionReason)) {
-                closeRejectModal();
-                alert('הנסיעה נדחתה בהצלחה');
+            if (!rejectionReason) {
+                showNotification('נא להזין סיבת דחייה', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/admin/reject_trip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        trip_id: tripId,
+                        rejection_reason: rejectionReason
+                    })
+                });
+
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showNotification('הנסיעה נדחתה בהצלחה', 'success');
+                    closeRejectModal();
+                    loadTrips();
+                } else {
+                    showNotification(data.message || 'אירעה שגיאה בדחיית הנסיעה', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showNotification('אירעה שגיאה בדחיית הנסיעה', 'error');
             }
         });
 
-        // Reschedule trip
-        function showRescheduleModal(tripId, currentDateTime) {
+        // פונקציות שינוי מועד
+        function showRescheduleModal(tripId) {
             document.getElementById('rescheduleTripId').value = tripId;
-            document.getElementById('newDateTime').value = currentDateTime.split('.')[0];
             document.getElementById('rescheduleModal').classList.remove('hidden');
         }
 
@@ -460,34 +553,38 @@
         document.getElementById('rescheduleForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const tripId = document.getElementById('rescheduleTripId').value;
-            const newDateTime = document.getElementById('newDateTime').value;
+            const newStartTime = document.getElementById('newStartTime').value;
+            const newEndTime = document.getElementById('newEndTime').value;
+
+            if (!newStartTime || !newEndTime) {
+                showNotification('נא להזין מועדים חדשים', 'error');
+                return;
+            }
 
             try {
-                console.log('Rescheduling trip:', { tripId, newDateTime });
                 const response = await fetch('/admin/reschedule_trip', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        _id: tripId,
-                        new_date_time: newDateTime
+                        trip_id: tripId,
+                        new_start_time: newStartTime,
+                        new_end_time: newEndTime
                     })
                 });
 
                 const data = await response.json();
-                console.log('Server response:', data);
-                
                 if (data.status === 'success') {
+                    showNotification('מועד הנסיעה עודכן בהצלחה', 'success');
                     closeRescheduleModal();
-                    alert('מועד הנסיעה עודכן בהצלחה');
-                    await loadTrips();
+                    loadTrips();
                 } else {
-                    alert(data.message || 'אירעה שגיאה בעדכון מועד הנסיעה');
+                    showNotification(data.message || 'אירעה שגיאה בעדכון מועד הנסיעה', 'error');
                 }
             } catch (error) {
-                console.error('Error rescheduling trip:', error);
-                alert('אירעה שגיאה בעדכון מועד הנסיעה');
+                console.error('Error:', error);
+                showNotification('אירעה שגיאה בעדכון מועד הנסיעה', 'error');
             }
         });
 
@@ -571,7 +668,8 @@
                 const data = {
                     driver_id: document.getElementById('driverSelect').value,
                     vehicle: formData.get('vehicle'),
-                    date_time: formData.get('date_time'),
+                    start_time: formData.get('start_time'),
+                    end_time: formData.get('end_time'),
                     purpose: formData.get('purpose'),
                     destination: formData.get('destination')
                 };
@@ -589,7 +687,7 @@
                 if (response.ok) {
                     showNotification('הנסיעה נוספה בהצלחה', 'success');
                     closeAddTripModal();
-                    loadTrips();  // רענון רשימת הנסיעות
+                    loadTrips();
                 } else {
                     throw new Error(result.message || 'אירעה שגיאה בהוספת הנסיעה');
                 }
