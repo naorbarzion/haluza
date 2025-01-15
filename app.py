@@ -603,76 +603,46 @@ def admin_get_trips():
 def reschedule_trip():
     try:
         data = request.json
-        logger.info(f"Rescheduling trip with data: {data}")
+        trip_id = data.get('trip_id')
+        new_date_time = data.get('new_date_time')
+        new_end_time = data.get('new_end_time')
         
-        # בדיקה שכל השדות הנדרשים קיימים
-        if not data:
-            logger.error("No JSON data received")
-            return jsonify({"status": "error", "message": "לא התקבלו נתונים"}), 400
-        
-        # קבלת מזהה הנסיעה מהבקשה
-        trip_id = data.get('_id') or data.get('trip_id')
-        if not trip_id:
-            logger.error("Missing trip ID in request")
-            return jsonify({"status": "error", "message": "חסר מזהה נסיעה"}), 400
+        if not all([trip_id, new_date_time, new_end_time]):
+            return jsonify({
+                "status": "error", 
+                "message": "חסרים פרטים נדרשים"
+            }), 400
             
-        if not data.get('new_date_time'):
-            logger.error("Missing new_date_time in request")
-            return jsonify({"status": "error", "message": "חסר מועד חדש"}), 400
+        # ולידציה של התאריכים
+        start_time = datetime.fromisoformat(new_date_time)
+        end_time = datetime.fromisoformat(new_end_time)
         
-        try:
-            if isinstance(trip_id, str):
-                trip_id = ObjectId(trip_id)
-        except Exception as e:
-            logger.error(f"Invalid trip_id format: {e}")
-            return jsonify({"status": "error", "message": "מזהה נסיעה לא תקין"}), 400
-        
-        # עדכון הנסיעה
+        if end_time <= start_time:
+            return jsonify({
+                "status": "error",
+                "message": "שעת הסיום חייבת להיות מאוחרת משעת ההתחלה"
+            }), 400
+            
         result = db.trips.update_one(
-            {'_id': trip_id},
-            {'$set': {'date_time': data['new_date_time']}}
+            {'_id': ObjectId(trip_id)},
+            {
+                '$set': {
+                    'date_time': new_date_time,
+                    'end_time': new_end_time,
+                    'rescheduled_by': ObjectId(session['user_id']),
+                    'rescheduled_at': datetime.utcnow()
+                }
+            }
         )
         
         if result.modified_count == 0:
-            logger.error(f"Trip {trip_id} not found")
             return jsonify({"status": "error", "message": "הנסיעה לא נמצאה"}), 404
-        
-        # שליפת הנסיעה המעודכנת
-        updated_trip = db.trips.find_one({'_id': trip_id})
-        if not updated_trip:
-            logger.error(f"Could not fetch updated trip {trip_id}")
-            return jsonify({"status": "error", "message": "שגיאה בשליפת הנסיעה המעודכנת"}), 500
             
-        # שליפת פרטי הנהג
-        driver = db.users.find_one({'_id': updated_trip['user_id']})
-        
-        # הכנת אובייקט התגובה
-        response_trip = {
-            '_id': str(updated_trip['_id']),
-            'user_id': str(updated_trip['user_id']),
-            'vehicle': updated_trip['vehicle'],
-            'date_time': updated_trip['date_time'],
-            'purpose': updated_trip['purpose'],
-            'destination': updated_trip.get('destination', ''),
-            'status': updated_trip['status'],
-            'rejection_reason': updated_trip.get('rejection_reason', ''),
-            'created_at': updated_trip.get('created_at', '').isoformat() if updated_trip.get('created_at') else '',
-            'driver_name': driver['full_name'] if driver else 'לא ידוע'
-        }
-        
-        logger.info(f"Successfully rescheduled trip {trip_id} to {data['new_date_time']}")
-        return jsonify({
-            "status": "success",
-            "message": "מועד הנסיעה עודכן בהצלחה",
-            "trip": response_trip
-        })
+        return jsonify({"status": "success", "message": "מועד הנסיעה עודכן בהצלחה"})
         
     except Exception as e:
         logger.error(f"Error in reschedule_trip: {str(e)}")
-        return jsonify({
-            "status": "error", 
-            "message": f"שגיאה בעדכון מועד הנסיעה: {str(e)}"
-        }), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/admin/add_trip', methods=['POST'])
 @login_required
@@ -744,6 +714,73 @@ def admin_add_trip():
             "status": "error", 
             "message": f"שגיאה בהוספת הנסיעה: {str(e)}"
         }), 500
+
+@app.route('/admin/approve_trip', methods=['POST'])
+@login_required
+@admin_required
+def approve_trip():
+    try:
+        data = request.json
+        trip_id = data.get('trip_id')
+        
+        if not trip_id:
+            return jsonify({"status": "error", "message": "לא התקבל מזהה נסיעה"}), 400
+            
+        result = db.trips.update_one(
+            {'_id': ObjectId(trip_id)},
+            {
+                '$set': {
+                    'status': 'approved',
+                    'admin_id': ObjectId(session['user_id']),
+                    'approved_at': datetime.utcnow()
+                }
+            }
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({"status": "error", "message": "הנסיעה לא נמצאה"}), 404
+            
+        return jsonify({"status": "success", "message": "הנסיעה אושרה בהצלחה"})
+        
+    except Exception as e:
+        logger.error(f"Error in approve_trip: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/admin/reject_trip', methods=['POST'])
+@login_required
+@admin_required
+def reject_trip():
+    try:
+        data = request.json
+        trip_id = data.get('trip_id')
+        rejection_reason = data.get('rejection_reason')
+        
+        if not trip_id or not rejection_reason:
+            return jsonify({
+                "status": "error", 
+                "message": "חסרים פרטים נדרשים"
+            }), 400
+            
+        result = db.trips.update_one(
+            {'_id': ObjectId(trip_id)},
+            {
+                '$set': {
+                    'status': 'rejected',
+                    'rejection_reason': rejection_reason,
+                    'admin_id': ObjectId(session['user_id']),
+                    'rejected_at': datetime.utcnow()
+                }
+            }
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({"status": "error", "message": "הנסיעה לא נמצאה"}), 404
+            
+        return jsonify({"status": "success", "message": "הנסיעה נדחתה בהצלחה"})
+        
+    except Exception as e:
+        logger.error(f"Error in reject_trip: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=False)  # שינוי ל-False בסביבת ייצור
