@@ -354,7 +354,8 @@
                                 <div class="bg-gray-50 p-3 rounded-lg">
                                     <div class="text-sm text-gray-600">${trip.purpose}</div>
                                     <div class="mt-2 text-sm font-medium">
-                                        <div><i class="far fa-calendar ml-1"></i>מועד: ${formatDateTime(trip.date_time)}</div>
+                                        <div><i class="far fa-calendar ml-1"></i>התחלה: ${formatDateTime(trip.date_time)}</div>
+                                        <div><i class="far fa-calendar ml-1"></i>סיום: ${trip.end_time ? formatDateTime(trip.end_time) : 'טרם נקבע'}</div>
                                     </div>
                                     <div class="mt-2 text-sm text-gray-600">
                                         <i class="fas fa-map-marker-alt ml-1"></i>${trip.destination}
@@ -400,7 +401,8 @@
                                     <div class="text-sm text-gray-500">${VEHICLES[trip.vehicle]}</div>
                                     <div class="mt-2 text-sm text-gray-600">${trip.purpose}</div>
                                     <div class="mt-1 text-sm text-gray-600">
-                                        <div><i class="far fa-calendar ml-1"></i>מועד: ${formatDateTime(trip.date_time)}</div>
+                                        <div><i class="far fa-calendar ml-1"></i>התחלה: ${formatDateTime(trip.date_time)}</div>
+                                        <div><i class="far fa-calendar ml-1"></i>סיום: ${trip.end_time ? formatDateTime(trip.end_time) : 'טרם נקבע'}</div>
                                     </div>
                                     <div class="mt-1 text-sm text-gray-600">
                                         <i class="fas fa-map-marker-alt ml-1"></i>${trip.destination}
