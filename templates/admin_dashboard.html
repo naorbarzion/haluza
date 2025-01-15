@@ -197,19 +197,26 @@
 
     <!-- Reschedule Modal -->
     <div id="rescheduleModal" class="hidden fixed inset-0 z-50">
-        <div class="modal-overlay absolute inset-0"></div>
+        <div class="modal-overlay absolute inset-0 bg-gray-500 bg-opacity-75"></div>
         <div class="fixed inset-0 flex items-center justify-center">
             <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
-                <h3 class="text-xl font-bold mb-4">שינוי מועד נסיעה</h3>
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold">תזמון מחדש</h3>
+                    <button onclick="closeRescheduleModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
                 <form id="rescheduleForm" class="space-y-4">
                     <input type="hidden" id="rescheduleTripId">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">מועד חדש</label>
-                        <input type="datetime-local" 
-                               id="newDateTime" 
-                               class="date-picker" 
-                               required>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar-alt ml-2"></i>תאריך ושעה חדשים
+                        </label>
+                        <input type="datetime-local" id="newDateTime" required
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
                     </div>
+                    
                     <div class="flex justify-end gap-4">
                         <button type="button" 
                                 onclick="closeRescheduleModal()"
@@ -329,10 +336,12 @@
             'car3': 'מרצדס בנץ - 19826603'
         };
 
+        let trips = [];
+
         async function loadTrips() {
             try {
                 const response = await fetch('/admin/get_trips');
-                const trips = await response.json();
+                trips = await response.json();
                 
                 const pendingTripsHtml = trips
                     .filter(trip => trip.status === 'pending')
@@ -489,8 +498,26 @@
         }
 
         async function approveTrip(tripId) {
-            if (await updateTripStatus(tripId, 'approved')) {
-                alert('הנסיעה אושרה בהצלחה');
+            try {
+                const response = await fetch('/admin/approve_trip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ _id: tripId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showNotification('הנסיעה אושרה בהצלחה', 'success');
+                    await loadTrips();
+                } else {
+                    throw new Error(data.message || 'אירעה שגיאה באישור הנסיעה');
+                }
+            } catch (error) {
+                console.error('Error approving trip:', error);
+                showNotification(error.message, 'error');
             }
         }
 
@@ -517,10 +544,20 @@
         });
 
         // Reschedule trip
-        function showRescheduleModal(tripId, currentDateTime) {
+        function showRescheduleModal(tripId) {
+            const modal = document.getElementById('rescheduleModal');
             document.getElementById('rescheduleTripId').value = tripId;
-            document.getElementById('newDateTime').value = currentDateTime.split('.')[0];
-            document.getElementById('rescheduleModal').classList.remove('hidden');
+            
+            // מצא את הנסיעה הנוכחית
+            const trip = trips.find(t => t._id === tripId);
+            if (trip) {
+                // המר את התאריך לפורמט המתאים ל-input
+                const dateTime = new Date(trip.date_time);
+                const formattedDateTime = dateTime.toISOString().slice(0, 16);
+                document.getElementById('newDateTime').value = formattedDateTime;
+            }
+            
+            modal.classList.remove('hidden');
         }
 
         function closeRescheduleModal() {
@@ -712,6 +749,37 @@
                 'car3': 'מרצדס בנץ - 19826603'
             };
             return vehicles[vehicleCode] || vehicleCode;
+        }
+
+        // פונקציות לטיפול בנסיעות
+        async function rejectTrip(tripId) {
+            const reason = prompt('נא להזין סיבת דחייה:');
+            if (reason === null) return; // המשתמש לחץ על ביטול
+            
+            try {
+                const response = await fetch('/admin/reject_trip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        _id: tripId,
+                        rejection_reason: reason
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showNotification('הנסיעה נדחתה בהצלחה', 'success');
+                    await loadTrips();
+                } else {
+                    throw new Error(data.message || 'אירעה שגיאה בדחיית הנסיעה');
+                }
+            } catch (error) {
+                console.error('Error rejecting trip:', error);
+                showNotification(error.message, 'error');
+            }
         }
     </script>
 </body>
