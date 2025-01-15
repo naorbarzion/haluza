@@ -562,36 +562,67 @@ def admin_get_trips():
         
         trips = list(db.trips.aggregate(pipeline))
         
+        # המרת ObjectId למחרוזות ועיבוד התאריכים
+        processed_trips = []
         for trip in trips:
-            trip['_id'] = str(trip['_id'])
-            trip['user_id'] = str(trip['user_id'])
-            if 'admin_id' in trip:
-                trip['admin_id'] = str(trip['admin_id'])
+            processed_trip = {
+                '_id': str(trip['_id']),
+                'user_id': str(trip['user_id']),
+                'vehicle': trip['vehicle'],
+                'purpose': trip['purpose'],
+                'destination': trip.get('destination', ''),
+                'status': trip['status']
+            }
             
-            # וידוא שהתאריכים בפורמט תקין
+            # המרת תאריכים
             if 'date_time' in trip:
                 try:
-                    # אם התאריך הוא string, נמיר אותו ל-ISO format
-                    if isinstance(trip['date_time'], str):
-                        trip['date_time'] = datetime.fromisoformat(trip['date_time']).isoformat()
-                except:
-                    trip['date_time'] = None
+                    if isinstance(trip['date_time'], datetime):
+                        processed_trip['date_time'] = trip['date_time'].isoformat()
+                    else:
+                        processed_trip['date_time'] = trip['date_time']
+                except Exception as e:
+                    logger.error(f"Error converting date_time: {e}")
+                    processed_trip['date_time'] = None
                     
             if 'end_time' in trip:
                 try:
-                    if isinstance(trip['end_time'], str):
-                        trip['end_time'] = datetime.fromisoformat(trip['end_time']).isoformat()
-                except:
-                    trip['end_time'] = None
+                    if isinstance(trip['end_time'], datetime):
+                        processed_trip['end_time'] = trip['end_time'].isoformat()
+                    else:
+                        processed_trip['end_time'] = trip['end_time']
+                except Exception as e:
+                    logger.error(f"Error converting end_time: {e}")
+                    processed_trip['end_time'] = None
             
-            if 'created_at' in trip and isinstance(trip['created_at'], datetime):
-                trip['created_at'] = trip['created_at'].isoformat()
-                
-            driver = db.users.find_one({'_id': ObjectId(trip['user_id'])})
-            trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
-            trip.pop('statusOrder', None)
+            if 'created_at' in trip:
+                try:
+                    if isinstance(trip['created_at'], datetime):
+                        processed_trip['created_at'] = trip['created_at'].isoformat()
+                    else:
+                        processed_trip['created_at'] = trip['created_at']
+                except Exception as e:
+                    logger.error(f"Error converting created_at: {e}")
+                    processed_trip['created_at'] = None
+            
+            # הוספת שם הנהג
+            try:
+                driver = db.users.find_one({'_id': ObjectId(processed_trip['user_id'])})
+                processed_trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
+            except Exception as e:
+                logger.error(f"Error fetching driver: {e}")
+                processed_trip['driver_name'] = 'לא ידוע'
+            
+            # הוספת פרטים נוספים אם קיימים
+            if 'rejection_reason' in trip:
+                processed_trip['rejection_reason'] = trip['rejection_reason']
+            
+            if 'admin_id' in trip:
+                processed_trip['admin_id'] = str(trip['admin_id'])
+            
+            processed_trips.append(processed_trip)
         
-        return jsonify(trips)
+        return jsonify(processed_trips)
         
     except Exception as e:
         logger.error(f"Error in admin_get_trips: {str(e)}")
