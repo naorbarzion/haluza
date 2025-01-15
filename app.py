@@ -583,7 +583,7 @@ def admin_get_trips():
             {
                 '$sort': {
                     'statusOrder': 1,
-                    'start_time': -1
+                    'date_time': -1
                 }
             }
         ]
@@ -603,11 +603,11 @@ def admin_get_trips():
             # המרת תאריכים למחרוזות
             if 'created_at' in trip and isinstance(trip['created_at'], datetime):
                 trip['created_at'] = trip['created_at'].isoformat()
-            if 'start_time' in trip and isinstance(trip['start_time'], datetime):
-                trip['start_time'] = trip['start_time'].isoformat()
+            if 'date_time' in trip and isinstance(trip['date_time'], datetime):
+                trip['date_time'] = trip['date_time'].isoformat()
             if 'end_time' in trip and isinstance(trip['end_time'], datetime):
                 trip['end_time'] = trip['end_time'].isoformat()
-        
+
         logger.info(f"Retrieved {len(trips)} trips")
         return jsonify(trips)
         
