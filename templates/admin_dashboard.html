@@ -606,11 +606,19 @@
         }
 
         function formatDateTime(dateStr) {
-            const date = new Date(dateStr);
-            return new Intl.DateTimeFormat('he-IL', {
-                dateStyle: 'medium',
-                timeStyle: 'short'
-            }).format(date);
+            try {
+                if (!dateStr) return 'לא צוין תאריך';
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return 'תאריך לא תקין';
+                
+                return new Intl.DateTimeFormat('he-IL', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short'
+                }).format(date);
+            } catch (error) {
+                console.error('Error formatting date:', dateStr, error);
+                return 'תאריך לא תקין';
+            }
         }
 
         // Load trips on page load
