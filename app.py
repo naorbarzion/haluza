@@ -333,12 +333,12 @@ def reports():
 @admin_required
 def get_drivers():
     try:
-        drivers = list(db.users.find({'role': 'driver'}, {'_id': 1, 'full_name': 1}).sort('full_name', 1))
+        # שליפת כל הנהגים
+        drivers = list(db.users.find({'role': 'driver'}, {'password': 0}))
         
-        # המרת ObjectId ל-string
+        # המרת ObjectId למחרוזת
         for driver in drivers:
-            driver['id'] = str(driver['_id'])
-            del driver['_id']
+            driver['_id'] = str(driver['_id'])
         
         return jsonify(drivers)
         
