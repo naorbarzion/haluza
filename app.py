@@ -202,24 +202,6 @@ def submit_trip():
                 "status": "error",
                 "message": "שעת הסיום חייבת להיות מאוחרת משעת ההתחלה"
             }), 400
-            
-        # בדיקת חפיפה עם נסיעות אחרות של אותו רכב
-        overlapping_trips = db.trips.find({
-            'vehicle': data['vehicle'],
-            'status': {'$ne': 'rejected'},
-            '$or': [
-                {
-                    'date_time': {'$lt': end_time.isoformat()},
-                    'end_time': {'$gt': start_time.isoformat()}
-                }
-            ]
-        })
-        
-        if list(overlapping_trips):
-            return jsonify({
-                "status": "error",
-                "message": "קיימת חפיפה עם נסיעה אחרת של אותו רכב"
-            }), 400
         
         trip = {
             'user_id': ObjectId(session['user_id']),
@@ -240,14 +222,12 @@ def submit_trip():
             'user_id': str(trip['user_id']),
             'vehicle': trip['vehicle'],
             'date_time': trip['date_time'],
+            'end_time': trip['end_time'],
             'purpose': trip['purpose'],
             'destination': trip['destination'],
             'status': trip['status'],
-            'rejection_reason': trip['rejection_reason'],
             'created_at': trip['created_at'].isoformat()
         }
-        
-        logger.info(f"New trip submitted: {trip_response}")
         
         return jsonify({
             "status": "success",
@@ -557,7 +537,6 @@ def calculate_duration(start, end):
 @admin_required
 def admin_get_trips():
     try:
-        # מיון לפי סטטוס (pending ראשון) ואז לפי תאריך
         pipeline = [
             {
                 '$addFields': {
@@ -583,7 +562,6 @@ def admin_get_trips():
         
         trips = list(db.trips.aggregate(pipeline))
         
-        # המרת ObjectId למחרוזת והוספת שם הנהג
         for trip in trips:
             trip['_id'] = str(trip['_id'])
             trip['user_id'] = str(trip['user_id'])
@@ -591,13 +569,14 @@ def admin_get_trips():
                 trip['admin_id'] = str(trip['admin_id'])
             driver = db.users.find_one({'_id': ObjectId(trip['user_id'])})
             trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
-            # הסרת שדה עזר
             trip.pop('statusOrder', None)
+            
             # המרת תאריכים למחרוזות
             if 'created_at' in trip and isinstance(trip['created_at'], datetime):
                 trip['created_at'] = trip['created_at'].isoformat()
+            if 'end_time' in trip:  # וידוא שיש שדה end_time
+                trip['end_time'] = trip['end_time']
         
-        logger.info(f"Retrieved {len(trips)} trips")
         return jsonify(trips)
         
     except Exception as e:
