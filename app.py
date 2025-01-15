@@ -583,7 +583,7 @@ def admin_get_trips():
             {
                 '$sort': {
                     'statusOrder': 1,
-                    'date_time': -1
+                    'start_time': -1
                 }
             }
         ]
@@ -591,25 +591,40 @@ def admin_get_trips():
         trips = list(db.trips.aggregate(pipeline))
         
         # המרת ObjectId למחרוזת והוספת שם הנהג
+        formatted_trips = []
         for trip in trips:
-            trip['_id'] = str(trip['_id'])
-            trip['user_id'] = str(trip['user_id'])
+            # המרת ObjectId למחרוזת
+            formatted_trip = {
+                '_id': str(trip['_id']),
+                'user_id': str(trip['user_id']),
+                'vehicle': trip['vehicle'],
+                'purpose': trip['purpose'],
+                'destination': trip['destination'],
+                'status': trip['status']
+            }
+            
+            # המרת תאריכים
+            if 'created_at' in trip:
+                formatted_trip['created_at'] = trip['created_at'].isoformat() if isinstance(trip['created_at'], datetime) else trip['created_at']
+            if 'start_time' in trip:
+                formatted_trip['date_time'] = trip['start_time'].isoformat() if isinstance(trip['start_time'], datetime) else trip['start_time']
+            if 'end_time' in trip:
+                formatted_trip['end_time'] = trip['end_time'].isoformat() if isinstance(trip['end_time'], datetime) else trip['end_time']
+            
+            # הוספת שדות נוספים אם קיימים
+            if 'rejection_reason' in trip:
+                formatted_trip['rejection_reason'] = trip['rejection_reason']
             if 'admin_id' in trip:
-                trip['admin_id'] = str(trip['admin_id'])
-            driver = db.users.find_one({'_id': ObjectId(trip['user_id'])})
-            trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
-            # הסרת שדה עזר
-            trip.pop('statusOrder', None)
-            # המרת תאריכים למחרוזות
-            if 'created_at' in trip and isinstance(trip['created_at'], datetime):
-                trip['created_at'] = trip['created_at'].isoformat()
-            if 'date_time' in trip and isinstance(trip['date_time'], datetime):
-                trip['date_time'] = trip['date_time'].isoformat()
-            if 'end_time' in trip and isinstance(trip['end_time'], datetime):
-                trip['end_time'] = trip['end_time'].isoformat()
+                formatted_trip['admin_id'] = str(trip['admin_id'])
+            
+            # הוספת שם הנהג
+            driver = db.users.find_one({'_id': ObjectId(formatted_trip['user_id'])})
+            formatted_trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
+            
+            formatted_trips.append(formatted_trip)
 
-        logger.info(f"Retrieved {len(trips)} trips")
-        return jsonify(trips)
+        logger.info(f"Retrieved {len(formatted_trips)} trips")
+        return jsonify(formatted_trips)
         
     except Exception as e:
         logger.error(f"Error in admin_get_trips: {str(e)}")
