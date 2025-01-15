@@ -361,41 +361,61 @@ def search_trips():
         data = request.json
         query = {}
         
-        if data.get('date_from'):
-            query['date_time'] = {'$gte': data['date_from']}
-        
-        if data.get('date_to'):
-            if 'date_time' in query:
-                query['date_time']['$lte'] = data['date_to']
-            else:
-                query['date_time'] = {'$lte': data['date_to']}
-        
+        # בניית השאילתה לפי הפרמטרים שהתקבלו
         if data.get('driver_id'):
             query['user_id'] = ObjectId(data['driver_id'])
-        
+            
+        if data.get('vehicle'):
+            query['vehicle'] = data['vehicle']
+            
         if data.get('status'):
             query['status'] = data['status']
+            
+        if data.get('start_date') or data.get('end_date'):
+            date_query = {}
+            if data.get('start_date'):
+                date_query['$gte'] = datetime.fromisoformat(data['start_date'])
+            if data.get('end_date'):
+                date_query['$lte'] = datetime.fromisoformat(data['end_date'])
+            query['date_time'] = date_query
         
+        # ביצוע החיפוש
         trips = list(db.trips.find(query).sort('date_time', -1))
         
-        # המרת ObjectId ל-string
+        # עיבוד התוצאות
+        processed_trips = []
         for trip in trips:
-            trip['_id'] = str(trip['_id'])
-            trip['user_id'] = str(trip['user_id'])
-            if 'admin_id' in trip:
-                trip['admin_id'] = str(trip['admin_id'])
-            # הוספת שם הנהג
-            driver = db.users.find_one({'_id': ObjectId(trip['user_id'])})
-            trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
-            # המרת תאריכים למחרוזות
-            if 'created_at' in trip and isinstance(trip['created_at'], datetime):
-                trip['created_at'] = trip['created_at'].isoformat()
+            try:
+                # קבלת פרטי הנהג
+                driver = db.users.find_one({'_id': trip['user_id']})
+                driver_name = driver['full_name'] if driver else 'לא ידוע'
+                
+                processed_trip = {
+                    '_id': str(trip['_id']),
+                    'driver_name': driver_name,
+                    'vehicle': trip['vehicle'],
+                    'date_time': trip['date_time'].isoformat() if isinstance(trip['date_time'], datetime) else trip['date_time'],
+                    'end_time': trip['end_time'].isoformat() if isinstance(trip['end_time'], datetime) else trip['end_time'],
+                    'purpose': trip['purpose'],
+                    'destination': trip.get('destination', ''),
+                    'status': trip['status'],
+                    'created_at': trip['created_at'].isoformat() if isinstance(trip['created_at'], datetime) else trip['created_at']
+                }
+                
+                if 'rejection_reason' in trip:
+                    processed_trip['rejection_reason'] = trip['rejection_reason']
+                    
+                processed_trips.append(processed_trip)
+                
+            except Exception as e:
+                logger.error(f"Error processing trip {trip.get('_id')}: {str(e)}")
+                continue
         
-        return jsonify(trips)
+        return jsonify(processed_trips)
         
     except Exception as e:
         logger.error(f"Error searching trips: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "שגיאה בטעינת הנסיעות"}), 500
 
 @app.route('/admin/update_trip_status', methods=['POST'])
 @login_required
@@ -494,61 +514,71 @@ def export_trips():
         data = request.json
         query = {}
         
-        if data.get('date_from'):
-            query['date_time'] = {'$gte': data['date_from']}
-        
-        if data.get('date_to'):
-            if 'date_time' in query:
-                query['date_time']['$lte'] = data['date_to']
-            else:
-                query['date_time'] = {'$lte': data['date_to']}
-        
+        # בניית השאילתה בדומה לפונקציית החיפוש
         if data.get('driver_id'):
             query['user_id'] = ObjectId(data['driver_id'])
-        
+        if data.get('vehicle'):
+            query['vehicle'] = data['vehicle']
         if data.get('status'):
             query['status'] = data['status']
-        
+        if data.get('start_date') or data.get('end_date'):
+            date_query = {}
+            if data.get('start_date'):
+                date_query['$gte'] = datetime.fromisoformat(data['start_date'])
+            if data.get('end_date'):
+                date_query['$lte'] = datetime.fromisoformat(data['end_date'])
+            query['date_time'] = date_query
+            
         trips = list(db.trips.find(query).sort('date_time', -1))
         
         # הכנת הנתונים לאקסל
         excel_data = []
         for trip in trips:
-            driver = db.users.find_one({'_id': trip['user_id']})
-            excel_data.append({
-                'תאריך ושעת התחלה': trip['date_time'],
-                'תאריך ושעת סיום': trip['end_time'],
-                'משך נסיעה': calculate_duration(trip['date_time'], trip['end_time']),
-                'שם הנהג': driver['full_name'] if driver else 'לא ידוע',
-                'רכב': trip['vehicle'],
-                'מטרת נסיעה': trip['purpose'],
-                'יעד': trip.get('destination', ''),
-                'סטטוס': trip['status']
-            })
+            try:
+                driver = db.users.find_one({'_id': trip['user_id']})
+                driver_name = driver['full_name'] if driver else 'לא ידוע'
+                
+                status_map = {
+                    'pending': 'ממתין לאישור',
+                    'approved': 'מאושר',
+                    'rejected': 'נדחה'
+                }
+                
+                vehicle_map = {
+                    'car1': 'יונדאי איוניק - 53836402',
+                    'car2': 'טויוטה סיטי - 15093804',
+                    'car3': 'מרצדס בנץ - 19826603'
+                }
+                
+                row = {
+                    'שם הנהג': driver_name,
+                    'רכב': vehicle_map.get(trip['vehicle'], trip['vehicle']),
+                    'תאריך ושעת התחלה': trip['date_time'].strftime('%d/%m/%Y %H:%M') if isinstance(trip['date_time'], datetime) else trip['date_time'],
+                    'תאריך ושעת סיום': trip['end_time'].strftime('%d/%m/%Y %H:%M') if isinstance(trip['end_time'], datetime) else trip['end_time'],
+                    'מטרת הנסיעה': trip['purpose'],
+                    'יעד': trip.get('destination', ''),
+                    'סטטוס': status_map.get(trip['status'], trip['status']),
+                    'סיבת דחייה': trip.get('rejection_reason', '') if trip.get('status') == 'rejected' else ''
+                }
+                excel_data.append(row)
+                
+            except Exception as e:
+                logger.error(f"Error processing trip for export {trip.get('_id')}: {str(e)}")
+                continue
         
+        if not excel_data:
+            return jsonify({"status": "error", "message": "לא נמצאו נסיעות להורדה"}), 404
+            
+        # יצירת DataFrame ושמירה לקובץ אקסל
         df = pd.DataFrame(excel_data)
         
-        # מיפוי ערכים
-        status_map = {
-            'pending': 'ממתין לאישור',
-            'approved': 'מאושר',
-            'rejected': 'נדחה'
-        }
-        df['סטטוס'] = df['סטטוס'].map(status_map)
-        
-        vehicle_map = {
-            'car1': 'יונדאי איוניק - 53836402',
-            'car2': 'טויוטה סיטי - 15093804',
-            'car3': 'מרצדס בנץ - 19826603'
-        }
-        df['רכב'] = df['רכב'].map(vehicle_map)
-        
-        # יצירת קובץ אקסל
+        # יצירת קובץ אקסל בזיכרון
         output = BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False, sheet_name='דוח נסיעות')
-            worksheet = writer.sheets['דוח נסיעות']
+            df.to_excel(writer, index=False, sheet_name='נסיעות')
+            worksheet = writer.sheets['נסיעות']
             
+            # התאמת רוחב העמודות
             for idx, col in enumerate(df.columns):
                 max_length = max(df[col].astype(str).apply(len).max(), len(col)) + 2
                 worksheet.set_column(idx, idx, max_length)
@@ -559,12 +589,12 @@ def export_trips():
             output,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
-            download_name=f'דוח_נסיעות_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
+            download_name=f'trips_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
         )
         
     except Exception as e:
         logger.error(f"Error exporting trips: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        return jsonify({"status": "error", "message": "שגיאה בייצוא הנסיעות"}), 500
 
 def calculate_duration(start, end):
     start_time = datetime.fromisoformat(start)
