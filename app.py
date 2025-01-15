@@ -191,19 +191,44 @@ def login():
 @app.route('/driver/submit_trip', methods=['POST'])
 @login_required
 def submit_trip():
-    if session.get('role') != 'driver':
-        return jsonify({"status": "error", "message": "Unauthorized"}), 403
-        
     try:
         data = request.form
+        start_time = datetime.fromisoformat(data['date_time'])
+        end_time = datetime.fromisoformat(data['end_time'])
+        
+        # ולידציה
+        if end_time <= start_time:
+            return jsonify({
+                "status": "error",
+                "message": "שעת הסיום חייבת להיות מאוחרת משעת ההתחלה"
+            }), 400
+            
+        # בדיקת חפיפה עם נסיעות אחרות של אותו רכב
+        overlapping_trips = db.trips.find({
+            'vehicle': data['vehicle'],
+            'status': {'$ne': 'rejected'},
+            '$or': [
+                {
+                    'date_time': {'$lt': end_time.isoformat()},
+                    'end_time': {'$gt': start_time.isoformat()}
+                }
+            ]
+        })
+        
+        if list(overlapping_trips):
+            return jsonify({
+                "status": "error",
+                "message": "קיימת חפיפה עם נסיעה אחרת של אותו רכב"
+            }), 400
+        
         trip = {
             'user_id': ObjectId(session['user_id']),
             'vehicle': data['vehicle'],
             'date_time': data['date_time'],
+            'end_time': data['end_time'],
             'purpose': data['purpose'],
             'destination': data['destination'],
             'status': 'pending',
-            'rejection_reason': None,
             'created_at': datetime.utcnow()
         }
         
@@ -469,13 +494,14 @@ def export_trips():
         for trip in trips:
             driver = db.users.find_one({'_id': trip['user_id']})
             excel_data.append({
-                'תאריך ושעה': trip['date_time'],
+                'תאריך ושעת התחלה': trip['date_time'],
+                'תאריך ושעת סיום': trip['end_time'],
+                'משך נסיעה': calculate_duration(trip['date_time'], trip['end_time']),
                 'שם הנהג': driver['full_name'] if driver else 'לא ידוע',
                 'רכב': trip['vehicle'],
                 'מטרת נסיעה': trip['purpose'],
                 'יעד': trip.get('destination', ''),
-                'סטטוס': trip['status'],
-                'תאריך יצירה': trip['created_at']
+                'סטטוס': trip['status']
             })
         
         df = pd.DataFrame(excel_data)
@@ -517,6 +543,14 @@ def export_trips():
     except Exception as e:
         logger.error(f"Error exporting trips: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+def calculate_duration(start, end):
+    start_time = datetime.fromisoformat(start)
+    end_time = datetime.fromisoformat(end)
+    duration = end_time - start_time
+    hours = duration.seconds // 3600
+    minutes = (duration.seconds % 3600) // 60
+    return f"{hours}:{minutes:02d}"
 
 @app.route('/admin/get_trips')
 @login_required
