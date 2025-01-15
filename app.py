@@ -1,735 +1,718 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
-from functools import wraps
-import os
-import pandas as pd
-from io import BytesIO
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
-import logging
-from dotenv import load_dotenv
-from bson import ObjectId
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ניהול נסיעות - Tracer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: #f8fafc;
+        }
 
-# הגדרת logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        }
 
-# טעינת משתני הסביבה
-load_dotenv()
+        .trip-card {
+            transition: all 0.3s ease;
+        }
 
-app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'your_secret_key_here')
+        .trip-card:hover {
+            transform: translateY(-2px);
+        }
 
-# התחברות ל-MongoDB עם טיפול שגיאות
-try:
-    MONGODB_URI = os.getenv('MONGODB_URI')
-    if not MONGODB_URI:
-        raise ValueError("MONGODB_URI is not set in environment variables")
-    
-    client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
-    # בדיקת חיבור
-    client.admin.command('ping')
-    logger.info("Successfully connected to MongoDB")
-    
-    db = client.tracer_db
-except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-    logger.error(f"Could not connect to MongoDB: {e}")
-    raise
-except Exception as e:
-    logger.error(f"An error occurred while connecting to MongoDB: {e}")
-    raise
-
-def get_greeting(hour):
-    if 5 <= hour < 12:
-        return "בוקר טוב"
-    elif 12 <= hour < 18:
-        return "צהריים טובים"
-    elif 18 <= hour < 22:
-        return "ערב טוב"
-    else:
-        return "לילה טוב"
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'role' not in session or session['role'] != 'admin':
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def create_default_users():
-    try:
-        # מחיקת כל הקולקציות הקיימות
-        db.users.drop()
-        db.trips.drop()
-        
-        # יצירת אינדקסים
-        db.users.create_index('username', unique=True)
-        db.trips.create_index([('user_id', 1), ('created_at', -1)])
-        db.trips.create_index([('status', 1), ('date_time', -1)])
-        
-        # משתמשי מנהל
-        admin_users = [
-            {
-                'username': 'admin',
-                'password': generate_password_hash('admin'),
-                'full_name': 'הנהלת מוסדות אסף',
-                'role': 'admin'
-            },
-            {
-                'username': 'admin2',
-                'password': generate_password_hash('1234'),
-                'full_name': 'הנהלת מוסדות שירי',
-                'role': 'admin'
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
             }
-        ]
-        
-        # הוספת משתמשי מנהל
-        result = db.users.insert_many(admin_users)
-        logger.info(f"Added {len(result.inserted_ids)} admin users")
-        
-        # משתמשי נהגים
-        drivers = [
-            {'username': 'moriel', 'password': generate_password_hash('3278'), 'full_name': 'חלוצית 4 - מוריאל', 'role': 'driver'},
-            {'username': 'doron', 'password': generate_password_hash('4521'), 'full_name': 'תלמוד תורה - דורון ותקין', 'role': 'driver'},
-            {'username': 'haravneria', 'password': generate_password_hash('8394'), 'full_name': 'תלמוד תורה - הרב נריה', 'role': 'driver'},
-            {'username': 'israel', 'password': generate_password_hash('6710'), 'full_name': 'תיכונית - ישראל רובינשטיין', 'role': 'driver'},
-            {'username': 'elad', 'password': generate_password_hash('5924'), 'full_name': 'תיכונית - אלעד בסטיקר', 'role': 'driver'},
-            {'username': 'haravasaf', 'password': generate_password_hash('3187'), 'full_name': 'תיכונית - הרב אסף נאומבורג', 'role': 'driver'},
-            {'username': 'natanel', 'password': generate_password_hash('4209'), 'full_name': 'חלוצי דרור - נתנאל שכטר', 'role': 'driver'},
-            {'username': 'anat', 'password': generate_password_hash('7536'), 'full_name': 'אולפנא - ענת', 'role': 'driver'},
-            {'username': 'yosef', 'password': generate_password_hash('9841'), 'full_name': 'אולפנא - יוסף', 'role': 'driver'},
-            {'username': 'haravyossi', 'password': generate_password_hash('2648'), 'full_name': 'ישיבה קטנה - הרב יוסי וייסברג', 'role': 'driver'},
-            {'username': 'barak', 'password': generate_password_hash('8307'), 'full_name': 'ישיבה גבוהה - ברק שיטרית', 'role': 'driver'},
-            {'username': 'shimon', 'password': generate_password_hash('6752'), 'full_name': 'מטבח - שמעון ג\'רבי', 'role': 'driver'},
-            {'username': 'orly', 'password': generate_password_hash('9435'), 'full_name': 'בית ספר לבנות - אורלי', 'role': 'driver'},
-            {'username': 'tamiravichai', 'password': generate_password_hash('5076'), 'full_name': 'תחזוקה - תמיר או אביחי', 'role': 'driver'}
-        ]
-        
-        # הוספת משתמשי נהגים
-        result = db.users.insert_many(drivers)
-        logger.info(f"Added {len(result.inserted_ids)} driver users")
-        
-        # יצירת נסיעה לדוגמה
-        example_driver = db.users.find_one({'username': 'moriel'})
-        if example_driver:
-            example_trip = {
-                'user_id': example_driver['_id'],
-                'vehicle': 'car1',
-                'date_time': datetime.utcnow().isoformat(),
-                'purpose': 'נסיעת דוגמה',
-                'destination': 'תל אביב',
-                'status': 'pending',
-                'created_at': datetime.utcnow()
+            to {
+                opacity: 1;
+                transform: translateY(0);
             }
-            db.trips.insert_one(example_trip)
-            logger.info("Added example trip")
-        
-        return True
-    except Exception as e:
-        logger.error(f"Error creating default users: {e}")
-        return False
+        }
 
-@app.route('/init-db')
-def init_database():
-    try:
-        if create_default_users():
-            return jsonify({"status": "success", "message": "משתמשים נוצרו בהצלחה"})
-        else:
-            return jsonify({"status": "error", "message": "שגיאה ביצירת משתמשים"}), 500
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        .slide-in {
+            animation: slideIn 0.5s ease-out forwards;
+        }
 
-@app.route('/')
-def index():
-    return redirect(url_for('login'))
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    # אם המשתמש כבר מחובר, נפנה אותו לדף המתאים
-    if 'user_id' in session:
-        if session.get('role') == 'admin':
-            return redirect(url_for('admin_dashboard'))
-        return redirect(url_for('driver_dashboard'))
+        .date-picker {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            width: 100%;
+        }
 
-    try:
-        if request.method == 'POST':
-            username = request.form['username']
-            password = request.form['password']
+        .date-picker:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+    </style>
+</head>
+<body>
+<!-- Header -->
+<header class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex justify-between items-center">
+            <img src="https://tracer.co.il/wp-content/uploads/elementor/thumbs/Logo-H-p8d906f0bmrgobnn9uwquzibery89mtbvr1plpc910.png" 
+                 alt="Tracer Logo" 
+                 class="h-12">
             
-            user = db.users.find_one({'username': username})
-            logger.info(f"Login attempt for user: {username}")
+            <div class="flex items-center gap-4">
+                <div class="text-lg font-medium text-gray-700">
+                    <i class="fas fa-user-shield text-blue-600 ml-2"></i>
+                    <span>{{ full_name }}</span>
+                </div>
+                <!-- כפתור דוחות -->
+                <a href="{{ url_for('reports') }}" 
+                   class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                    <i class="fas fa-chart-bar ml-1"></i>
+                    דוחות
+                </a>
+                <a href="{{ url_for('logout') }}" 
+                   class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2">
+                    <i class="fas fa-sign-out-alt"></i>
+                    התנתק
+                </a>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-4">
+                    <div class="bg-blue-100 p-3 rounded-lg">
+                        <i class="fas fa-clock text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm text-gray-600">ממתינות לאישור</h3>
+                        <p class="text-2xl font-bold" id="pendingCount">0</p>
+                    </div>
+                </div>
+            </div>
             
-            if user and check_password_hash(user['password'], password):
-                session['user_id'] = str(user['_id'])
-                session['username'] = user['username']
-                session['full_name'] = user['full_name']
-                session['role'] = user['role']
-                logger.info(f"Successful login for user: {username}")
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-4">
+                    <div class="bg-green-100 p-3 rounded-lg">
+                        <i class="fas fa-check text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm text-gray-600">נסיעות מאושרות</h3>
+                        <p class="text-2xl font-bold" id="approvedCount">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-4">
+                    <div class="bg-purple-100 p-3 rounded-lg">
+                        <i class="fas fa-car text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm text-gray-600">סה"כ נסיעות</h3>
+                        <p class="text-2xl font-bold" id="totalCount">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending and Approved Trips -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Pending Trips -->
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-yellow-100 p-3 rounded-lg">
+                        <i class="fas fa-hourglass-half text-yellow-600 text-xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold">נסיעות ממתינות</h2>
+                </div>
+                <div id="pendingTrips" class="space-y-4">
+                    <!-- Pending trips will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Approved Trips -->
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="bg-green-100 p-3 rounded-lg">
+                        <i class="fas fa-calendar-check text-green-600 text-xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold">נסיעות מאושרות</h2>
+                </div>
+                <div id="approvedTrips" class="space-y-4">
+                    <!-- Approved trips will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Reject Modal -->
+    <div id="rejectModal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="fixed inset-0 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+                <h3 class="text-xl font-bold mb-4">דחיית נסיעה</h3>
+                <form id="rejectForm" class="space-y-4">
+                    <input type="hidden" id="rejectTripId">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">סיבת דחייה</label>
+                        <textarea id="rejectionReason" 
+                                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  rows="3" required></textarea>
+                    </div>
+                    <div class="flex justify-end gap-4">
+                        <button type="button" 
+                                onclick="closeRejectModal()"
+                                class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                            ביטול
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">
+                            דחה נסיעה
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reschedule Modal -->
+    <div id="rescheduleModal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="fixed inset-0 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+                <h3 class="text-xl font-bold mb-4">שינוי מועד נסיעה</h3>
+                <form id="rescheduleForm" class="space-y-4">
+                    <input type="hidden" id="rescheduleTripId">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">מועד חדש</label>
+                        <input type="datetime-local" 
+                               id="newDateTime" 
+                               class="date-picker" 
+                               required>
+                    </div>
+                    <div class="flex justify-end gap-4">
+                        <button type="button" 
+                                onclick="closeRescheduleModal()"
+                                class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                            ביטול
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
+                            עדכן מועד
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Trip Modal -->
+    <div id="addTripModal" class="hidden fixed inset-0 z-50">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="fixed inset-0 flex items-center justify-center">
+            <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold">הוספת נסיעה חדשה</h3>
+                    <button onclick="closeAddTripModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
                 
-                if user['role'] == 'admin':
-                    return redirect(url_for('admin_dashboard'))
-                return redirect(url_for('driver_dashboard'))
-            
-            logger.warning(f"Failed login attempt for user: {username}")
-            return render_template('login.html', error='שם משתמש או סיסמה שגויים')
-        
-        return render_template('login.html')
-    except Exception as e:
-        logger.error(f"Error in login route: {e}")
-        return render_template('login.html', error='אירעה שגיאה במערכת, אנא נסה שוב מאוחר יותר')
+                <form id="addTripForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-user ml-2"></i>בחירת נהג
+                        </label>
+                        <select id="driverSelect" required
+                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">בחר נהג</option>
+                        </select>
+                    </div>
 
-@app.route('/driver/submit_trip', methods=['POST'])
-@login_required
-def submit_trip():
-    try:
-        data = request.form
-        start_time = datetime.fromisoformat(data['date_time'])
-        end_time = datetime.fromisoformat(data['end_time'])
-        
-        # ולידציה
-        if end_time <= start_time:
-            return jsonify({
-                "status": "error",
-                "message": "שעת הסיום חייבת להיות מאוחרת משעת ההתחלה"
-            }), 400
-        
-        trip = {
-            'user_id': ObjectId(session['user_id']),
-            'vehicle': data['vehicle'],
-            'date_time': data['date_time'],
-            'end_time': data['end_time'],
-            'purpose': data['purpose'],
-            'destination': data['destination'],
-            'status': 'pending',
-            'created_at': datetime.utcnow()
-        }
-        
-        result = db.trips.insert_one(trip)
-        
-        # המרת ObjectId למחרוזת לפני החזרה
-        trip_response = {
-            '_id': str(result.inserted_id),
-            'user_id': str(trip['user_id']),
-            'vehicle': trip['vehicle'],
-            'date_time': trip['date_time'],
-            'end_time': trip['end_time'],
-            'purpose': trip['purpose'],
-            'destination': trip['destination'],
-            'status': trip['status'],
-            'created_at': trip['created_at'].isoformat()
-        }
-        
-        return jsonify({
-            "status": "success",
-            "message": "הנסיעה נוספה בהצלחה",
-            "trip": trip_response
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in submit_trip: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-car-side ml-2"></i>בחירת רכב
+                        </label>
+                        <select name="vehicle" required
+                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">בחר רכב</option>
+                            <option value="car1">יונדאי איוניק - 53836402</option>
+                            <option value="car2">טויוטה סיטי - 15093804</option>
+                            <option value="car3">מרצדס בנץ - 19826603</option>
+                        </select>
+                    </div>
 
-@app.route('/driver/get_trips')
-@login_required
-def driver_get_trips():
-    try:
-        # שליפת כל הנסיעות של הנהג
-        trips = list(db.trips.find(
-            {'user_id': ObjectId(session['user_id'])}
-        ).sort('created_at', -1))
-        
-        # המרת ObjectId למחרוזת
-        for trip in trips:
-            trip['_id'] = str(trip['_id'])
-            trip['user_id'] = str(trip['user_id'])
-            # המרת תאריכים למחרוזות
-            if 'created_at' in trip and isinstance(trip['created_at'], datetime):
-                trip['created_at'] = trip['created_at'].isoformat()
-        
-        logger.info(f"Retrieved {len(trips)} trips for driver {session['user_id']}")
-        return jsonify(trips)
-        
-    except Exception as e:
-        logger.error(f"Error in driver_get_trips: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-calendar-alt ml-2"></i>תאריך ושעת התחלה
+                            </label>
+                            <input type="datetime-local" name="date_time" required
+                                   class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                <i class="fas fa-calendar-check ml-2"></i>תאריך ושעת סיום
+                            </label>
+                            <input type="datetime-local" name="end_time" required
+                                   class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        </div>
+                    </div>
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('login'))
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-bullseye ml-2"></i>מטרת הנסיעה
+                        </label>
+                        <textarea name="purpose" rows="2" required
+                                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="פרט את מטרת הנסיעה..."></textarea>
+                    </div>
 
-@app.route('/driver/dashboard')
-@login_required
-def driver_dashboard():
-    if session.get('role') != 'driver':
-        return redirect(url_for('index'))
-    current_hour = datetime.now().hour
-    greeting = get_greeting(current_hour)
-    return render_template('driver_dashboard.html', 
-                         greeting=greeting,
-                         full_name=session.get('full_name'))
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-map-marker-alt ml-2"></i>יעד הנסיעה
+                        </label>
+                        <textarea name="destination" rows="2" required
+                                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                  placeholder="פרט את יעד הנסיעה..."></textarea>
+                    </div>
 
-@app.route('/admin/dashboard')
-@login_required
-@admin_required
-def admin_dashboard():
-    return render_template('admin_dashboard.html', 
-                         full_name=session.get('full_name'))
+                    <div class="flex justify-end gap-4 mt-6">
+                        <button type="button" 
+                                onclick="closeAddTripModal()"
+                                class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
+                            ביטול
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
+                            הוסף נסיעה
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-@app.route('/admin/reports')
-@login_required
-@admin_required
-def reports():
-    return render_template('reports.html', 
-                         full_name=session.get('full_name'))
+    <!-- Add Trip Button -->
+    <div class="fixed bottom-8 left-8">
+        <button onclick="showAddTripModal()" 
+                class="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors">
+            <i class="fas fa-plus text-xl"></i>
+        </button>
+    </div>
 
-@app.route('/admin/get_drivers')
-@login_required
-@admin_required
-def get_drivers():
-    try:
-        drivers = list(db.users.find({'role': 'driver'}, {'_id': 1, 'full_name': 1}).sort('full_name', 1))
-        
-        # המרת ObjectId ל-string
-        for driver in drivers:
-            driver['id'] = str(driver['_id'])
-            del driver['_id']
-        
-        return jsonify(drivers)
-        
-    except Exception as e:
-        logger.error(f"Error getting drivers: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/admin/search_trips', methods=['POST'])
-@login_required
-@admin_required
-def search_trips():
-    try:
-        data = request.json
-        query = {}
-        
-        if data.get('date_from'):
-            query['date_time'] = {'$gte': data['date_from']}
-        
-        if data.get('date_to'):
-            if 'date_time' in query:
-                query['date_time']['$lte'] = data['date_to']
-            else:
-                query['date_time'] = {'$lte': data['date_to']}
-        
-        if data.get('driver_id'):
-            query['user_id'] = ObjectId(data['driver_id'])
-        
-        if data.get('status'):
-            query['status'] = data['status']
-        
-        trips = list(db.trips.find(query).sort('date_time', -1))
-        
-        # המרת ObjectId ל-string
-        for trip in trips:
-            trip['_id'] = str(trip['_id'])
-            trip['user_id'] = str(trip['user_id'])
-            if 'admin_id' in trip:
-                trip['admin_id'] = str(trip['admin_id'])
-            # הוספת שם הנהג
-            driver = db.users.find_one({'_id': ObjectId(trip['user_id'])})
-            trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
-            # המרת תאריכים למחרוזות
-            if 'created_at' in trip and isinstance(trip['created_at'], datetime):
-                trip['created_at'] = trip['created_at'].isoformat()
-        
-        return jsonify(trips)
-        
-    except Exception as e:
-        logger.error(f"Error searching trips: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/admin/update_trip_status', methods=['POST'])
-@login_required
-@admin_required
-def update_trip_status():
-    try:
-        data = request.json
-        logger.info(f"Updating trip status with data: {data}")
-        
-        # בדיקה שכל השדות הנדרשים קיימים
-        if not data:
-            logger.error("No JSON data received")
-            return jsonify({"status": "error", "message": "לא התקבלו נתונים"}), 400
-        
-        # קבלת מזהה הנסיעה מהבקשה
-        trip_id = data.get('_id') or data.get('trip_id')
-        if not trip_id:
-            logger.error("Missing trip ID in request")
-            return jsonify({"status": "error", "message": "חסר מזהה נסיעה"}), 400
-            
-        if not data.get('status'):
-            logger.error("Missing status in request")
-            return jsonify({"status": "error", "message": "חסר סטטוס"}), 400
-        
-        # הכנת נתוני העדכון
-        update_data = {
-            'status': data['status']
-        }
-        
-        # הוספת סיבת דחייה אם קיימת
-        if data.get('rejection_reason'):
-            update_data['rejection_reason'] = data['rejection_reason']
-        elif data['status'] == 'rejected' and not data.get('rejection_reason'):
-            logger.error("Missing rejection reason for rejected status")
-            return jsonify({"status": "error", "message": "חסרה סיבת דחייה"}), 400
-        
-        try:
-            if isinstance(trip_id, str):
-                trip_id = ObjectId(trip_id)
-        except Exception as e:
-            logger.error(f"Invalid trip_id format: {e}")
-            return jsonify({"status": "error", "message": "מזהה נסיעה לא תקין"}), 400
-        
-        # עדכון הנסיעה
-        result = db.trips.update_one(
-            {'_id': trip_id},
-            {'$set': update_data}
-        )
-        
-        if result.modified_count == 0:
-            logger.error(f"Trip {trip_id} not found")
-            return jsonify({"status": "error", "message": "הנסיעה לא נמצאה"}), 404
-        
-        # שליפת הנסיעה המעודכנת
-        updated_trip = db.trips.find_one({'_id': trip_id})
-        if not updated_trip:
-            logger.error(f"Could not fetch updated trip {trip_id}")
-            return jsonify({"status": "error", "message": "שגיאה בשליפת הנסיעה המעודכנת"}), 500
-            
-        # שליפת פרטי הנהג
-        driver = db.users.find_one({'_id': updated_trip['user_id']})
-        
-        # הכנת אובייקט התגובה
-        response_trip = {
-            '_id': str(updated_trip['_id']),
-            'user_id': str(updated_trip['user_id']),
-            'vehicle': updated_trip['vehicle'],
-            'date_time': updated_trip['date_time'],
-            'purpose': updated_trip['purpose'],
-            'destination': updated_trip.get('destination', ''),
-            'status': updated_trip['status'],
-            'rejection_reason': updated_trip.get('rejection_reason', ''),
-            'created_at': updated_trip.get('created_at', '').isoformat() if updated_trip.get('created_at') else '',
-            'driver_name': driver['full_name'] if driver else 'לא ידוע'
-        }
-        
-        logger.info(f"Successfully updated trip {trip_id} to status {data['status']}")
-        return jsonify({
-            "status": "success",
-            "message": "סטטוס הנסיעה עודכן בהצלחה",
-            "trip": response_trip
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in update_trip_status: {str(e)}")
-        return jsonify({
-            "status": "error", 
-            "message": f"שגיאה בעדכון סטטוס הנסיעה: {str(e)}"
-        }), 500
-
-@app.route('/admin/export_trips', methods=['POST'])
-@login_required
-@admin_required
-def export_trips():
-    try:
-        data = request.json
-        query = {}
-        
-        if data.get('date_from'):
-            query['date_time'] = {'$gte': data['date_from']}
-        
-        if data.get('date_to'):
-            if 'date_time' in query:
-                query['date_time']['$lte'] = data['date_to']
-            else:
-                query['date_time'] = {'$lte': data['date_to']}
-        
-        if data.get('driver_id'):
-            query['user_id'] = ObjectId(data['driver_id'])
-        
-        if data.get('status'):
-            query['status'] = data['status']
-        
-        trips = list(db.trips.find(query).sort('date_time', -1))
-        
-        # הכנת הנתונים לאקסל
-        excel_data = []
-        for trip in trips:
-            driver = db.users.find_one({'_id': trip['user_id']})
-            excel_data.append({
-                'תאריך ושעת התחלה': trip['date_time'],
-                'תאריך ושעת סיום': trip['end_time'],
-                'משך נסיעה': calculate_duration(trip['date_time'], trip['end_time']),
-                'שם הנהג': driver['full_name'] if driver else 'לא ידוע',
-                'רכב': trip['vehicle'],
-                'מטרת נסיעה': trip['purpose'],
-                'יעד': trip.get('destination', ''),
-                'סטטוס': trip['status']
-            })
-        
-        df = pd.DataFrame(excel_data)
-        
-        # מיפוי ערכים
-        status_map = {
-            'pending': 'ממתין לאישור',
-            'approved': 'מאושר',
-            'rejected': 'נדחה'
-        }
-        df['סטטוס'] = df['סטטוס'].map(status_map)
-        
-        vehicle_map = {
+    <script>
+        const VEHICLES = {
             'car1': 'יונדאי איוניק - 53836402',
             'car2': 'טויוטה סיטי - 15093804',
             'car3': 'מרצדס בנץ - 19826603'
-        }
-        df['רכב'] = df['רכב'].map(vehicle_map)
-        
-        # יצירת קובץ אקסל
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False, sheet_name='דוח נסיעות')
-            worksheet = writer.sheets['דוח נסיעות']
-            
-            for idx, col in enumerate(df.columns):
-                max_length = max(df[col].astype(str).apply(len).max(), len(col)) + 2
-                worksheet.set_column(idx, idx, max_length)
-        
-        output.seek(0)
-        
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=f'דוח_נסיעות_{datetime.now().strftime("%Y%m%d_%H%M")}.xlsx'
-        )
-        
-    except Exception as e:
-        logger.error(f"Error exporting trips: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        };
 
-def calculate_duration(start, end):
-    start_time = datetime.fromisoformat(start)
-    end_time = datetime.fromisoformat(end)
-    duration = end_time - start_time
-    hours = duration.seconds // 3600
-    minutes = (duration.seconds % 3600) // 60
-    return f"{hours}:{minutes:02d}"
-
-@app.route('/admin/get_trips')
-@login_required
-@admin_required
-def admin_get_trips():
-    try:
-        pipeline = [
-            {
-                '$addFields': {
-                    'statusOrder': {
-                        '$switch': {
-                            'branches': [
-                                {'case': {'$eq': ['$status', 'pending']}, 'then': 1},
-                                {'case': {'$eq': ['$status', 'approved']}, 'then': 2},
-                                {'case': {'$eq': ['$status', 'rejected']}, 'then': 3}
-                            ],
-                            'default': 4
-                        }
-                    }
-                }
-            },
-            {
-                '$sort': {
-                    'statusOrder': 1,
-                    'date_time': -1
-                }
+        async function loadTrips() {
+            try {
+                const response = await fetch('/admin/get_trips');
+                const trips = await response.json();
+                
+                const pendingTripsHtml = trips
+                    .filter(trip => trip.status === 'pending')
+                    .map(trip => `
+                        <div class="trip-card glass-effect rounded-xl p-6 slide-in">
+                            <div class="flex justify-between items-start">
+                                <div class="space-y-3">
+                                    <div class="flex items-center gap-2">
+                                        <div class="bg-blue-100 p-2 rounded">
+                                            <i class="fas fa-car-side text-blue-600"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-lg">${trip.driver_name}</div>
+                                            <div class="text-gray-500">
+                                                <div class="text-sm">רכב: ${getVehicleName(trip.vehicle)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- זמני הנסיעה -->
+                                    <div class="bg-gray-50 p-3 rounded-lg space-y-2">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-clock text-blue-600"></i>
+                                            <div>
+                                                <div class="text-sm text-gray-600">התחלה: ${formatDateTime(trip.date_time)}</div>
+                                                <div class="text-sm text-gray-600">סיום: ${formatDateTime(trip.end_time)}</div>
+                                                <div class="text-sm font-medium text-blue-600">
+                                                    משך מתוכנן: ${calculateDuration(trip.date_time, trip.end_time)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- מטרה ויעד -->
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-700">מטרת הנסיעה:</div>
+                                            <div class="text-sm text-gray-600">${trip.purpose}</div>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-700">יעד:</div>
+                                            <div class="text-sm text-gray-600">${trip.destination || 'לא צוין'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- כפתורי פעולה -->
+                                <div class="flex flex-col gap-2">
+                                    <button onclick="approveTrip('${trip._id}')"
+                                            class="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
+                                        <i class="fas fa-check ml-1"></i>אשר
+                                    </button>
+                                    <button onclick="rejectTrip('${trip._id}')"
+                                            class="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors">
+                                        <i class="fas fa-times ml-1"></i>דחה
+                                    </button>
+                                    <button onclick="showRescheduleModal('${trip._id}')"
+                                            class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
+                                        <i class="fas fa-calendar-alt ml-1"></i>תזמן מחדש
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                
+                document.getElementById('pendingTrips').innerHTML = pendingTripsHtml || 
+                    '<div class="text-center text-gray-500 py-8">אין נסיעות ממתינות</div>';
+                    
+                // עדכון לנסיעות מאושרות
+                const approvedTripsHtml = trips
+                    .filter(trip => trip.status === 'approved')
+                    .map((trip, index) => `
+                        <div class="trip-card glass-card rounded-xl p-6 slide-in" style="animation-delay: ${index * 0.1}s">
+                            <div class="flex justify-between items-start">
+                                <div class="space-y-3">
+                                    <div class="flex items-center gap-2">
+                                        <div class="bg-green-100 p-2 rounded">
+                                            <i class="fas fa-car-side text-green-600"></i>
+                                        </div>
+                                        <div>
+                                            <div class="font-medium text-lg">${trip.driver_name}</div>
+                                            <div class="text-gray-500">
+                                                <div class="text-sm">רכב: ${getVehicleName(trip.vehicle)}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- זמני הנסיעה -->
+                                    <div class="bg-gray-50 p-3 rounded-lg space-y-2">
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-clock text-green-600"></i>
+                                            <div>
+                                                <div class="text-sm text-gray-600">התחלה: ${formatDateTime(trip.date_time)}</div>
+                                                <div class="text-sm text-gray-600">סיום: ${formatDateTime(trip.end_time)}</div>
+                                                <div class="text-sm font-medium text-green-600">
+                                                    משך מתוכנן: ${calculateDuration(trip.date_time, trip.end_time)}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- מטרה ויעד -->
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-700">מטרת הנסיעה:</div>
+                                            <div class="text-sm text-gray-600">${trip.purpose}</div>
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-medium text-gray-700">יעד:</div>
+                                            <div class="text-sm text-gray-600">${trip.destination || 'לא צוין'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                document.getElementById('approvedTrips').innerHTML = approvedTripsHtml || 
+                    '<div class="text-center text-gray-500 py-8">אין נסיעות מאושרות</div>';
+                    
+            } catch (error) {
+                console.error('Error loading trips:', error);
+                showNotification('שגיאה בטעינת הנסיעות', 'error');
             }
-        ]
-        
-        trips = list(db.trips.aggregate(pipeline))
-        
-        for trip in trips:
-            trip['_id'] = str(trip['_id'])
-            trip['user_id'] = str(trip['user_id'])
-            if 'admin_id' in trip:
-                trip['admin_id'] = str(trip['admin_id'])
-            driver = db.users.find_one({'_id': ObjectId(trip['user_id'])})
-            trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
-            trip.pop('statusOrder', None)
-            
-            # המרת תאריכים למחרוזות
-            if 'created_at' in trip and isinstance(trip['created_at'], datetime):
-                trip['created_at'] = trip['created_at'].isoformat()
-            if 'end_time' in trip:  # וידוא שיש שדה end_time
-                trip['end_time'] = trip['end_time']
-        
-        return jsonify(trips)
-        
-    except Exception as e:
-        logger.error(f"Error in admin_get_trips: {str(e)}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/admin/reschedule_trip', methods=['POST'])
-@login_required
-@admin_required
-def reschedule_trip():
-    try:
-        data = request.json
-        logger.info(f"Rescheduling trip with data: {data}")
-        
-        # בדיקה שכל השדות הנדרשים קיימים
-        if not data:
-            logger.error("No JSON data received")
-            return jsonify({"status": "error", "message": "לא התקבלו נתונים"}), 400
-        
-        # קבלת מזהה הנסיעה מהבקשה
-        trip_id = data.get('_id') or data.get('trip_id')
-        if not trip_id:
-            logger.error("Missing trip ID in request")
-            return jsonify({"status": "error", "message": "חסר מזהה נסיעה"}), 400
-            
-        if not data.get('new_date_time'):
-            logger.error("Missing new_date_time in request")
-            return jsonify({"status": "error", "message": "חסר מועד חדש"}), 400
-        
-        try:
-            if isinstance(trip_id, str):
-                trip_id = ObjectId(trip_id)
-        except Exception as e:
-            logger.error(f"Invalid trip_id format: {e}")
-            return jsonify({"status": "error", "message": "מזהה נסיעה לא תקין"}), 400
-        
-        # עדכון הנסיעה
-        result = db.trips.update_one(
-            {'_id': trip_id},
-            {'$set': {'date_time': data['new_date_time']}}
-        )
-        
-        if result.modified_count == 0:
-            logger.error(f"Trip {trip_id} not found")
-            return jsonify({"status": "error", "message": "הנסיעה לא נמצאה"}), 404
-        
-        # שליפת הנסיעה המעודכנת
-        updated_trip = db.trips.find_one({'_id': trip_id})
-        if not updated_trip:
-            logger.error(f"Could not fetch updated trip {trip_id}")
-            return jsonify({"status": "error", "message": "שגיאה בשליפת הנסיעה המעודכנת"}), 500
-            
-        # שליפת פרטי הנהג
-        driver = db.users.find_one({'_id': updated_trip['user_id']})
-        
-        # הכנת אובייקט התגובה
-        response_trip = {
-            '_id': str(updated_trip['_id']),
-            'user_id': str(updated_trip['user_id']),
-            'vehicle': updated_trip['vehicle'],
-            'date_time': updated_trip['date_time'],
-            'purpose': updated_trip['purpose'],
-            'destination': updated_trip.get('destination', ''),
-            'status': updated_trip['status'],
-            'rejection_reason': updated_trip.get('rejection_reason', ''),
-            'created_at': updated_trip.get('created_at', '').isoformat() if updated_trip.get('created_at') else '',
-            'driver_name': driver['full_name'] if driver else 'לא ידוע'
-        }
-        
-        logger.info(f"Successfully rescheduled trip {trip_id} to {data['new_date_time']}")
-        return jsonify({
-            "status": "success",
-            "message": "מועד הנסיעה עודכן בהצלחה",
-            "trip": response_trip
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in reschedule_trip: {str(e)}")
-        return jsonify({
-            "status": "error", 
-            "message": f"שגיאה בעדכון מועד הנסיעה: {str(e)}"
-        }), 500
-
-@app.route('/admin/add_trip', methods=['POST'])
-@login_required
-@admin_required
-def admin_add_trip():
-    try:
-        data = request.json
-        logger.info(f"Admin adding trip with data: {data}")
-        
-        # בדיקת תקינות הנתונים
-        required_fields = ['driver_id', 'vehicle', 'date_time', 'purpose', 'destination']
-        for field in required_fields:
-            if not data.get(field):
-                return jsonify({
-                    "status": "error",
-                    "message": f"שדה חובה חסר: {field}"
-                }), 400
-
-        # המרת מזהה הנהג ל-ObjectId
-        try:
-            driver_id = ObjectId(data['driver_id'])
-        except Exception as e:
-            logger.error(f"Invalid driver_id format: {e}")
-            return jsonify({"status": "error", "message": "מזהה נהג לא תקין"}), 400
-
-        # בדיקה שהנהג קיים
-        driver = db.users.find_one({'_id': driver_id, 'role': 'driver'})
-        if not driver:
-            return jsonify({"status": "error", "message": "הנהג לא נמצא"}), 404
-
-        # יצירת הנסיעה
-        trip = {
-            'user_id': driver_id,
-            'vehicle': data['vehicle'],
-            'date_time': data['date_time'],
-            'purpose': data['purpose'],
-            'destination': data['destination'],
-            'status': 'approved',  # נסיעות שהאדמין מוסיף מאושרות אוטומטית
-            'created_at': datetime.utcnow(),
-            'added_by_admin': True,  # סימון שהנסיעה נוספה על ידי אדמין
-            'admin_id': ObjectId(session['user_id'])  # שמירת מזהה האדמין שהוסיף
         }
 
-        result = db.trips.insert_one(trip)
-        
-        # הכנת אובייקט התגובה
-        response_trip = {
-            '_id': str(result.inserted_id),
-            'user_id': str(trip['user_id']),
-            'vehicle': trip['vehicle'],
-            'date_time': trip['date_time'],
-            'purpose': trip['purpose'],
-            'destination': trip['destination'],
-            'status': trip['status'],
-            'created_at': trip['created_at'].isoformat(),
-            'driver_name': driver['full_name']
-        }
-        
-        logger.info(f"Successfully added trip for driver {driver['full_name']}")
-        return jsonify({
-            "status": "success",
-            "message": "הנסיעה נוספה בהצלחה",
-            "trip": response_trip
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in admin_add_trip: {str(e)}")
-        return jsonify({
-            "status": "error", 
-            "message": f"שגיאה בהוספת הנסיעה: {str(e)}"
-        }), 500
+        async function updateTripStatus(tripId, status, rejectionReason = '') {
+            try {
+                console.log('Updating trip:', { tripId, status, rejectionReason });
+                const response = await fetch('/admin/update_trip_status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        _id: tripId,
+                        status: status,
+                        rejection_reason: rejectionReason
+                    })
+                });
 
-if __name__ == '__main__':
-    app.run(debug=False)  # שינוי ל-False בסביבת ייצור
+                const data = await response.json();
+                console.log('Server response:', data);
+                
+                if (data.status === 'success') {
+                    // רענון הנסיעות
+                    await loadTrips();
+                    return true;
+                } else {
+                    alert(data.message || 'אירעה שגיאה בעדכון הנסיעה');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error updating trip status:', error);
+                alert('אירעה שגיאה בעדכון הנסיעה');
+                return false;
+            }
+        }
+
+        async function approveTrip(tripId) {
+            if (await updateTripStatus(tripId, 'approved')) {
+                alert('הנסיעה אושרה בהצלחה');
+            }
+        }
+
+        function showRejectModal(tripId) {
+            document.getElementById('rejectTripId').value = tripId;
+            document.getElementById('rejectModal').classList.remove('hidden');
+        }
+
+        function closeRejectModal() {
+            document.getElementById('rejectModal').classList.add('hidden');
+            document.getElementById('rejectionReason').value = '';
+        }
+
+        document.getElementById('rejectForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const tripId = document.getElementById('rejectTripId').value;
+            const rejectionReason = document.getElementById('rejectionReason').value;
+            
+            if (await updateTripStatus(tripId, 'rejected', rejectionReason)) {
+                closeRejectModal();
+                alert('הנסיעה נדחתה בהצלחה');
+            }
+        });
+
+        // Reschedule trip
+        function showRescheduleModal(tripId, currentDateTime) {
+            document.getElementById('rescheduleTripId').value = tripId;
+            document.getElementById('newDateTime').value = currentDateTime.split('.')[0];
+            document.getElementById('rescheduleModal').classList.remove('hidden');
+        }
+
+        function closeRescheduleModal() {
+            document.getElementById('rescheduleModal').classList.add('hidden');
+            document.getElementById('rescheduleForm').reset();
+        }
+
+        document.getElementById('rescheduleForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const tripId = document.getElementById('rescheduleTripId').value;
+            const newDateTime = document.getElementById('newDateTime').value;
+
+            try {
+                console.log('Rescheduling trip:', { tripId, newDateTime });
+                const response = await fetch('/admin/reschedule_trip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        _id: tripId,
+                        new_date_time: newDateTime
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Server response:', data);
+                
+                if (data.status === 'success') {
+                    closeRescheduleModal();
+                    alert('מועד הנסיעה עודכן בהצלחה');
+                    await loadTrips();
+                } else {
+                    alert(data.message || 'אירעה שגיאה בעדכון מועד הנסיעה');
+                }
+            } catch (error) {
+                console.error('Error rescheduling trip:', error);
+                alert('אירעה שגיאה בעדכון מועד הנסיעה');
+            }
+        });
+
+        // Helper functions
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 left-4 p-4 rounded-lg shadow-lg z-50 slide-in
+                ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+            
+            notification.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}-circle"></i>
+                    ${message}
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+
+        // פונקציית עזר לפורמט תאריכים
+        function formatDateTime(dateStr) {
+            try {
+                if (!dateStr) return 'לא צוין';
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return 'תאריך לא תקין';
+                
+                return new Intl.DateTimeFormat('he-IL', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short'
+                }).format(date);
+            } catch (error) {
+                console.error('Error formatting date:', error, dateStr);
+                return 'תאריך לא תקין';
+            }
+        }
+
+        // פונקציית עזר לחישוב משך הנסיעה
+        function calculateDuration(start, end) {
+            try {
+                if (!start || !end) return 'לא צוין';
+                const startTime = new Date(start);
+                const endTime = new Date(end);
+                
+                if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+                    return 'לא ניתן לחשב';
+                }
+                
+                const diff = (endTime - startTime) / (1000 * 60); // הפרש בדקות
+                
+                const hours = Math.floor(diff / 60);
+                const minutes = Math.floor(diff % 60);
+                
+                return `${hours} שעות ו-${minutes} דקות`;
+            } catch (error) {
+                console.error('Error calculating duration:', error, {start, end});
+                return 'לא ניתן לחשב';
+            }
+        }
+
+        // Load trips on page load
+        document.addEventListener('DOMContentLoaded', loadTrips);
+
+        // Add Trip Modal Functions
+        function showAddTripModal() {
+            document.getElementById('addTripModal').classList.remove('hidden');
+            loadDriversForSelect();
+        }
+
+        function closeAddTripModal() {
+            document.getElementById('addTripModal').classList.add('hidden');
+            document.getElementById('addTripForm').reset();
+        }
+
+        async function loadDriversForSelect() {
+            try {
+                const response = await fetch('/admin/get_drivers');
+                const drivers = await response.json();
+                const select = document.getElementById('driverSelect');
+                
+                // נקה אפשרויות קיימות
+                select.innerHTML = '<option value="">בחר נהג</option>';
+                
+                // הוסף את הנהגים
+                drivers.forEach(driver => {
+                    const option = document.createElement('option');
+                    option.value = driver.id;
+                    option.textContent = driver.full_name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading drivers:', error);
+                showNotification('שגיאה בטעינת רשימת הנהגים', 'error');
+            }
+        }
+
+        // Add Trip Form Submission
+        document.getElementById('addTripForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const submitButton = this.querySelector('button[type="submit"]');
+            const originalContent = submitButton.innerHTML;
+            
+            try {
+                submitButton.disabled = true;
+                submitButton.innerHTML = `
+                    <div class="flex items-center justify-center">
+                        <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        <span class="mr-2">מוסיף...</span>
+                    </div>
+                `;
+
+                const formData = new FormData(this);
+                const data = {
+                    driver_id: document.getElementById('driverSelect').value,
+                    vehicle: formData.get('vehicle'),
+                    date_time: formData.get('date_time'),
+                    purpose: formData.get('purpose'),
+                    destination: formData.get('destination')
+                };
+
+                const response = await fetch('/admin/add_trip', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showNotification('הנסיעה נוספה בהצלחה', 'success');
+                    closeAddTripModal();
+                    loadTrips();  // רענון רשימת הנסיעות
+                } else {
+                    throw new Error(result.message || 'אירעה שגיאה בהוספת הנסיעה');
+                }
+            } catch (error) {
+                showNotification(error.message, 'error');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.innerHTML = originalContent;
+            }
+        });
+
+        // פונקציית עזר להמרת קוד רכב לשם מלא
+        function getVehicleName(vehicleCode) {
+            const vehicles = {
+                'car1': 'יונדאי איוניק - 53836402',
+                'car2': 'טויוטה סיטי - 15093804',
+                'car3': 'מרצדס בנץ - 19826603'
+            };
+            return vehicles[vehicleCode] || vehicleCode;
+        }
+    </script>
+</body>
+</html>
