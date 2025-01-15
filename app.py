@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 import os
 import pandas as pd
@@ -249,43 +249,56 @@ def submit_trip():
 @login_required
 def get_driver_trips():
     try:
-        # נוסיף לוגים לדיבוג
         logger.info(f"Fetching trips for driver ID: {session['user_id']}")
-        
-        # בדיקת הפורמט של user_id בשאילתה
         user_id = ObjectId(session['user_id'])
-        logger.info(f"Converted user_id to ObjectId: {user_id}")
         
         # נבדוק קודם אילו נסיעות קיימות עבור המשתמש
-        all_trips = list(db.trips.find({'user_id': user_id}))
+        all_trips = list(db.trips.find({'user_id': user_id}).sort('created_at', -1))
         logger.info(f"Found {len(all_trips)} trips for user")
-        
-        # נדפיס את הפרטים של כל נסיעה לבדיקה
-        for trip in all_trips:
-            logger.info(f"Trip details: {trip}")
         
         # עיבוד הנסיעות
         processed_trips = []
         for trip in all_trips:
-            processed_trip = {
-                '_id': str(trip['_id']),
-                'user_id': str(trip['user_id']),
-                'vehicle': trip['vehicle'],
-                'date_time': trip['date_time'].isoformat() if isinstance(trip['date_time'], datetime) else trip['date_time'],
-                'end_time': trip['end_time'].isoformat() if isinstance(trip['end_time'], datetime) else trip['end_time'],
-                'purpose': trip['purpose'],
-                'destination': trip.get('destination', ''),
-                'status': trip['status'],
-                'created_at': trip['created_at'].isoformat() if isinstance(trip['created_at'], datetime) else trip['created_at']
-            }
-            
-            # הוספת סיבת דחייה אם קיימת
-            if 'rejection_reason' in trip:
-                processed_trip['rejection_reason'] = trip['rejection_reason']
+            try:
+                # בדיקה אם חסר שדה end_time
+                if 'end_time' not in trip:
+                    # אם אין שעת סיום, נגדיר אותה כשעה אחרי שעת ההתחלה
+                    if isinstance(trip['date_time'], datetime):
+                        trip['end_time'] = trip['date_time'] + timedelta(hours=1)
+                    else:
+                        start_time = datetime.fromisoformat(trip['date_time'])
+                        trip['end_time'] = start_time + timedelta(hours=1)
+                    
+                    # נעדכן את הנסיעה במסד הנתונים
+                    db.trips.update_one(
+                        {'_id': trip['_id']},
+                        {'$set': {'end_time': trip['end_time']}}
+                    )
+                    logger.info(f"Added missing end_time for trip {trip['_id']}")
+
+                processed_trip = {
+                    '_id': str(trip['_id']),
+                    'user_id': str(trip['user_id']),
+                    'vehicle': trip['vehicle'],
+                    'date_time': trip['date_time'].isoformat() if isinstance(trip['date_time'], datetime) else trip['date_time'],
+                    'end_time': trip['end_time'].isoformat() if isinstance(trip['end_time'], datetime) else trip['end_time'],
+                    'purpose': trip['purpose'],
+                    'destination': trip.get('destination', ''),
+                    'status': trip['status'],
+                    'created_at': trip['created_at'].isoformat() if isinstance(trip['created_at'], datetime) else trip['created_at']
+                }
                 
-            processed_trips.append(processed_trip)
+                if 'rejection_reason' in trip:
+                    processed_trip['rejection_reason'] = trip['rejection_reason']
+                    
+                processed_trips.append(processed_trip)
+                
+            except Exception as e:
+                logger.error(f"Error processing trip {trip.get('_id')}: {str(e)}")
+                # נמשיך לנסיעה הבאה במקרה של שגיאה
+                continue
             
-        logger.info(f"Processed {len(processed_trips)} trips successfully")
+        logger.info(f"Successfully processed {len(processed_trips)} trips")
         return jsonify(processed_trips)
         
     except Exception as e:
@@ -896,6 +909,51 @@ def fix_old_trips():
         
     except Exception as e:
         logger.error(f"Error fixing old trips: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/admin/fix_missing_end_times', methods=['POST'])
+@login_required
+@admin_required
+def fix_missing_end_times():
+    try:
+        # מצא את כל הנסיעות ללא שעת סיום
+        trips_without_end = db.trips.find({'end_time': {'$exists': False}})
+        
+        fixed_count = 0
+        for trip in trips_without_end:
+            try:
+                # המרת שעת התחלה לדייטטיים אם צריך
+                if isinstance(trip['date_time'], str):
+                    start_time = datetime.fromisoformat(trip['date_time'])
+                else:
+                    start_time = trip['date_time']
+                
+                # הגדרת שעת סיום כשעה אחרי ההתחלה
+                end_time = start_time + timedelta(hours=1)
+                
+                # עדכון הנסיעה
+                result = db.trips.update_one(
+                    {'_id': trip['_id']},
+                    {'$set': {
+                        'end_time': end_time,
+                        'date_time': start_time  # מעדכן גם את שעת ההתחלה למקרה שהייתה מחרוזת
+                    }}
+                )
+                
+                if result.modified_count > 0:
+                    fixed_count += 1
+                    
+            except Exception as e:
+                logger.error(f"Error fixing trip {trip['_id']}: {str(e)}")
+                continue
+        
+        return jsonify({
+            "status": "success",
+            "message": f"תוקנו {fixed_count} נסיעות ללא שעת סיום"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fixing missing end times: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
