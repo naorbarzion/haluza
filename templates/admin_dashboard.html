@@ -226,80 +226,54 @@
         </div>
     </div>
 
-    <!-- Add Trip Modal -->
-    <div id="addTripModal" class="hidden fixed inset-0 z-50">
-        <div class="modal-overlay absolute inset-0"></div>
-        <div class="fixed inset-0 flex items-center justify-center">
-            <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold">הוספת נסיעה חדשה</h3>
-                    <button onclick="closeAddTripModal()" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-times"></i>
-                    </button>
+    <!-- Modal for adding new trip -->
+    <div class="modal fade" id="addTripModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">הוספת נסיעה חדשה</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                
-                <form id="addTripForm" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-user ml-2"></i>בחירת נהג
-                        </label>
-                        <select id="driverSelect" required
-                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                            <option value="">בחר נהג</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-car-side ml-2"></i>בחירת רכב
-                        </label>
-                        <select name="vehicle" required
-                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                            <option value="">בחר רכב</option>
-                            <option value="car1">יונדאי איוניק - 53836402</option>
-                            <option value="car2">טויוטה סיטי - 15093804</option>
-                            <option value="car3">מרצדס בנץ - 19826603</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-calendar-alt ml-2"></i>תאריך ושעה
-                        </label>
-                        <input type="datetime-local" name="date_time" required
-                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-bullseye ml-2"></i>מטרת הנסיעה
-                        </label>
-                        <textarea name="purpose" rows="2" required
-                                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                                  placeholder="פרט את מטרת הנסיעה..."></textarea>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-map-marker-alt ml-2"></i>יעד הנסיעה
-                        </label>
-                        <textarea name="destination" rows="2" required
-                                  class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                                  placeholder="פרט את יעד הנסיעה..."></textarea>
-                    </div>
-
-                    <div class="flex justify-end gap-4 mt-6">
-                        <button type="button" 
-                                onclick="closeAddTripModal()"
-                                class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
-                            ביטול
-                        </button>
-                        <button type="submit"
-                                class="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
-                            הוסף נסיעה
-                        </button>
-                    </div>
-                </form>
+                <div class="modal-body">
+                    <form id="adminAddTripForm">
+                        <div class="mb-3">
+                            <label class="form-label">נהג</label>
+                            <select class="form-select" name="driver_id" required>
+                                <option value="">בחר נהג</option>
+                                <!-- יתמלא דינמית -->
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">רכב</label>
+                            <select class="form-select" name="vehicle" required>
+                                <option value="">בחר רכב</option>
+                                <option value="car1">יונדאי איוניק - 53836402</option>
+                                <option value="car2">טויוטה סיטי - 15093804</option>
+                                <option value="car3">מרצדס בנץ - 19826603</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">תאריך ושעת התחלה</label>
+                            <input type="datetime-local" class="form-control" name="start_time" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">תאריך ושעת סיום</label>
+                            <input type="datetime-local" class="form-control" name="end_time" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">מטרת הנסיעה</label>
+                            <input type="text" class="form-control" name="purpose" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">יעד</label>
+                            <input type="text" class="form-control" name="destination" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                    <button type="button" class="btn btn-primary" onclick="submitAdminAddTrip()">הוסף נסיעה</button>
+                </div>
             </div>
         </div>
     </div>
@@ -626,6 +600,114 @@
                 submitButton.innerHTML = originalContent;
             }
         });
+
+        function submitAdminAddTrip() {
+            const form = document.getElementById('adminAddTripForm');
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            fetch('/admin/add_trip', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showAlert('success', data.message);
+                    $('#addTripModal').modal('hide');
+                    form.reset();
+                    loadTrips();
+                } else {
+                    showAlert('danger', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('danger', 'אירעה שגיאה בהוספת הנסיעה');
+            });
+        }
+
+        // עדכון פונקציית החיפוש
+        function searchTrips() {
+            const searchData = {
+                date_from: document.getElementById('searchDateFrom').value,
+                date_to: document.getElementById('searchDateTo').value,
+                driver_id: document.getElementById('searchDriver').value,
+                status: document.getElementById('searchStatus').value
+            };
+
+            fetch('/admin/search_trips', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(searchData)
+            })
+            .then(response => response.json())
+            .then(trips => {
+                displayTrips(trips);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showAlert('danger', 'אירעה שגיאה בחיפוש הנסיעות');
+            });
+        }
+
+        function displayTrip(trip) {
+            return `
+            <div class="trip-card bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
+                <div class="flex justify-between items-start">
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-blue-100 p-2 rounded-lg">
+                                <i class="fas fa-car text-blue-600"></i>
+                            </div>
+                            <div>
+                                <div class="font-medium">${VEHICLES[trip.vehicle] || trip.vehicle}</div>
+                                <div class="text-sm text-gray-500">
+                                    <div><i class="fas fa-play ml-1"></i>התחלה: ${formatDateTime(trip.start_time)}</div>
+                                    <div><i class="fas fa-stop ml-1"></i>סיום: ${formatDateTime(trip.end_time)}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="text-sm text-gray-600">
+                                <span class="font-medium">נהג:</span> ${trip.driver_name}
+                            </div>
+                            <div class="text-sm text-gray-600">
+                                <span class="font-medium">מטרה:</span> ${trip.purpose}
+                            </div>
+                            <div class="text-sm text-gray-600">
+                                <span class="font-medium">יעד:</span> ${trip.destination}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col items-end gap-2">
+                        <div class="status-badge ${getStatusBadgeClass(trip.status)} px-3 py-1 rounded-full text-sm">
+                            ${getStatusText(trip.status)}
+                        </div>
+                        ${trip.status === 'pending' ? `
+                            <div class="flex gap-2">
+                                <button onclick="approveTrip('${trip._id}')" 
+                                        class="btn-approve bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded-full text-sm">
+                                    <i class="fas fa-check"></i>
+                                    אישור
+                                </button>
+                                <button onclick="showRejectModal('${trip._id}')"
+                                        class="btn-reject bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded-full text-sm">
+                                    <i class="fas fa-times"></i>
+                                    דחייה
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+            `;
+        }
     </script>
 </body>
 </html>
