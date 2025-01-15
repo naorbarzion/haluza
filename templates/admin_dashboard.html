@@ -402,7 +402,7 @@
                 // עדכון דומה לנסיעות מאושרות
                 const approvedTripsHtml = trips
                     .filter(trip => trip.status === 'approved')
-                    .map(trip => `
+                    .map((trip, index) => `
                         <div class="trip-card glass-card rounded-xl p-6 slide-in" style="animation-delay: ${index * 0.1}s">
                             <div class="flex justify-between items-center">
                                 <div class="flex gap-4">
