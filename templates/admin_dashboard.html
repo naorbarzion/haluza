@@ -324,7 +324,14 @@
         async function loadTrips() {
             try {
                 const response = await fetch('/admin/get_trips');
+                if (!response.ok) {
+                    throw new Error('שגיאה בטעינת הנסיעות');
+                }
+                
                 const data = await response.json();
+                if (!Array.isArray(data)) {
+                    throw new Error('התקבלו נתונים לא תקינים מהשרת');
+                }
                 
                 // Update stats
                 const stats = {
@@ -416,6 +423,13 @@
             } catch (error) {
                 console.error('Error loading trips:', error);
                 showNotification('אירעה שגיאה בטעינת הנסיעות', 'error');
+                
+                // ניקוי הרשימות במקרה של שגיאה
+                document.getElementById('pendingTrips').innerHTML = '<div class="text-center text-gray-500 py-8">אין נסיעות ממתינות</div>';
+                document.getElementById('approvedTrips').innerHTML = '<div class="text-center text-gray-500 py-8">אין נסיעות מאושרות</div>';
+                document.getElementById('pendingCount').textContent = '0';
+                document.getElementById('approvedCount').textContent = '0';
+                document.getElementById('totalCount').textContent = '0';
             }
         }
 
