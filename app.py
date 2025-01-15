@@ -577,13 +577,16 @@ def admin_get_trips():
                             ],
                             'default': 4
                         }
+                    },
+                    'effective_start_time': {
+                        '$ifNull': ['$start_time', '$date_time']
                     }
                 }
             },
             {
                 '$sort': {
                     'statusOrder': 1,
-                    'start_time': -1
+                    'effective_start_time': -1
                 }
             }
         ]
@@ -606,8 +609,14 @@ def admin_get_trips():
             # המרת תאריכים
             if 'created_at' in trip:
                 formatted_trip['created_at'] = trip['created_at'].isoformat() if isinstance(trip['created_at'], datetime) else trip['created_at']
+            
+            # טיפול בתאריך התחלה (תמיכה בשני הפורמטים)
             if 'start_time' in trip:
-                formatted_trip['date_time'] = trip['start_time'].isoformat() if isinstance(trip['start_time'], datetime) else trip['start_time']
+                formatted_trip['start_time'] = trip['start_time'].isoformat() if isinstance(trip['start_time'], datetime) else trip['start_time']
+            if 'date_time' in trip:
+                formatted_trip['date_time'] = trip['date_time'].isoformat() if isinstance(trip['date_time'], datetime) else trip['date_time']
+            
+            # טיפול בתאריך סיום
             if 'end_time' in trip:
                 formatted_trip['end_time'] = trip['end_time'].isoformat() if isinstance(trip['end_time'], datetime) else trip['end_time']
             
