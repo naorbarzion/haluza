@@ -970,5 +970,49 @@ def fix_missing_end_times():
         logger.error(f"Error fixing missing end times: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/admin/delete_trip', methods=['POST'])
+@login_required
+@admin_required
+def delete_trip():
+    try:
+        data = request.json
+        trip_id = data.get('trip_id')
+        
+        if not trip_id:
+            return jsonify({
+                "status": "error",
+                "message": "לא התקבל מזהה נסיעה"
+            }), 400
+            
+        # בדיקה שהנסיעה קיימת
+        trip = db.trips.find_one({'_id': ObjectId(trip_id)})
+        if not trip:
+            return jsonify({
+                "status": "error",
+                "message": "הנסיעה לא נמצאה"
+            }), 404
+        
+        # מחיקת הנסיעה
+        result = db.trips.delete_one({'_id': ObjectId(trip_id)})
+        
+        if result.deleted_count == 0:
+            return jsonify({
+                "status": "error",
+                "message": "הנסיעה לא נמצאה או שכבר נמחקה"
+            }), 404
+            
+        logger.info(f"Trip {trip_id} was deleted by admin {session['user_id']}")
+        return jsonify({
+            "status": "success",
+            "message": "הנסיעה נמחקה בהצלחה"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in delete_trip: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"שגיאה במחיקת הנסיעה: {str(e)}"
+        }), 500
+
 if __name__ == '__main__':
     app.run(debug=False)  # שינוי ל-False בסביבת ייצור
