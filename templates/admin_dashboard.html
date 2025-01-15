@@ -636,6 +636,19 @@
                 submitButton.innerHTML = originalContent;
             }
         });
+
+        // פונקציית עזר לחישוב משך הנסיעה
+        function calculateDuration(start, end) {
+            if (!start || !end) return 'לא צוין';
+            const startTime = new Date(start);
+            const endTime = new Date(end);
+            const diff = (endTime - startTime) / (1000 * 60); // הפרש בדקות
+            
+            const hours = Math.floor(diff / 60);
+            const minutes = Math.floor(diff % 60);
+            
+            return `${hours} שעות ו-${minutes} דקות`;
+        }
     </script>
 </body>
 </html>
