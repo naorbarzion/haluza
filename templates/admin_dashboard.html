@@ -2,80 +2,164 @@
 <html lang="he" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>לוח בקרה - מנהל</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ניהול נסיעות - Tracer</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/js/all.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Rubik', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+        }
+
+        .trip-card {
+            transition: all 0.3s ease;
+        }
+
+        .trip-card:hover {
+            transform: translateY(-2px);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .slide-in {
+            animation: slideIn 0.5s ease-out forwards;
+        }
+
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+
+        .date-picker {
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 0.5rem;
+            width: 100%;
+        }
+
+        .date-picker:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+        }
+    </style>
 </head>
-<body class="bg-gray-50">
-    <nav class="bg-white shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between h-16">
-                <div class="flex items-center">
-                    <h1 class="text-xl font-bold">לוח בקרה - מנהל</h1>
+<body>
+<!-- Header -->
+<header class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-4">
+        <div class="flex justify-between items-center">
+            <img src="https://tracer.co.il/wp-content/uploads/elementor/thumbs/Logo-H-p8d906f0bmrgobnn9uwquzibery89mtbvr1plpc910.png" 
+                 alt="Tracer Logo" 
+                 class="h-12">
+            
+            <div class="flex items-center gap-4">
+                <div class="text-lg font-medium text-gray-700">
+                    <i class="fas fa-user-shield text-blue-600 ml-2"></i>
+                    <span>{{ full_name }}</span>
                 </div>
+                <!-- כפתור דוחות -->
+                <a href="{{ url_for('reports') }}" 
+                   class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                    <i class="fas fa-chart-bar ml-1"></i>
+                    דוחות
+                </a>
+                <a href="{{ url_for('logout') }}" 
+                   class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors flex items-center gap-2">
+                    <i class="fas fa-sign-out-alt"></i>
+                    התנתק
+                </a>
+            </div>
+        </div>
+    </div>
+</header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="glass-card rounded-xl p-6">
                 <div class="flex items-center gap-4">
-                    <a href="/logout" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-sign-out-alt ml-1"></i>התנתק
-                    </a>
+                    <div class="bg-blue-100 p-3 rounded-lg">
+                        <i class="fas fa-clock text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm text-gray-600">ממתינות לאישור</h3>
+                        <p class="text-2xl font-bold" id="pendingCount">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-4">
+                    <div class="bg-green-100 p-3 rounded-lg">
+                        <i class="fas fa-check text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm text-gray-600">נסיעות מאושרות</h3>
+                        <p class="text-2xl font-bold" id="approvedCount">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-card rounded-xl p-6">
+                <div class="flex items-center gap-4">
+                    <div class="bg-purple-100 p-3 rounded-lg">
+                        <i class="fas fa-car text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm text-gray-600">סה"כ נסיעות</h3>
+                        <p class="text-2xl font-bold" id="totalCount">0</p>
+                    </div>
                 </div>
             </div>
         </div>
-    </nav>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div class="grid grid-cols-1 gap-8">
-            <!-- נסיעות ממתינות -->
-            <div>
+        <!-- Pending and Approved Trips -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Pending Trips -->
+            <div class="glass-card rounded-xl p-6">
                 <div class="flex items-center gap-3 mb-6">
                     <div class="bg-yellow-100 p-3 rounded-lg">
-                        <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                        <i class="fas fa-hourglass-half text-yellow-600 text-xl"></i>
                     </div>
-                    <div>
-                        <h2 class="text-2xl font-bold">נסיעות ממתינות</h2>
-                        <p class="text-gray-500">
-                            <span id="pendingCount">0</span> נסיעות ממתינות לאישור
-                        </p>
-                    </div>
+                    <h2 class="text-2xl font-bold">נסיעות ממתינות</h2>
                 </div>
                 <div id="pendingTrips" class="space-y-4">
                     <!-- Pending trips will be loaded here -->
                 </div>
             </div>
 
-            <!-- נסיעות מאושרות -->
-            <div>
+            <!-- Approved Trips -->
+            <div class="glass-card rounded-xl p-6">
                 <div class="flex items-center gap-3 mb-6">
                     <div class="bg-green-100 p-3 rounded-lg">
-                        <i class="fas fa-check text-green-600 text-xl"></i>
+                        <i class="fas fa-calendar-check text-green-600 text-xl"></i>
                     </div>
-                    <div>
-                        <h2 class="text-2xl font-bold">נסיעות מאושרות</h2>
-                        <p class="text-gray-500">
-                            <span id="approvedCount">0</span> נסיעות מאושרות
-                        </p>
-                    </div>
+                    <h2 class="text-2xl font-bold">נסיעות מאושרות</h2>
                 </div>
                 <div id="approvedTrips" class="space-y-4">
                     <!-- Approved trips will be loaded here -->
-                </div>
-            </div>
-
-            <!-- נסיעות שנדחו -->
-            <div>
-                <div class="flex items-center gap-3 mb-6">
-                    <div class="bg-red-100 p-3 rounded-lg">
-                        <i class="fas fa-times text-red-600 text-xl"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-2xl font-bold">נסיעות שנדחו</h2>
-                        <p class="text-gray-500">
-                            <span id="rejectedCount">0</span> נסיעות שנדחו
-                        </p>
-                    </div>
-                </div>
-                <div id="rejectedTrips" class="space-y-4">
-                    <!-- Rejected trips will be loaded here -->
                 </div>
             </div>
         </div>
@@ -120,12 +204,10 @@
                 <form id="rescheduleForm" class="space-y-4">
                     <input type="hidden" id="rescheduleTripId">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-clock ml-2"></i>תאריך ושעה חדשים
-                        </label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">מועד חדש</label>
                         <input type="datetime-local" 
                                id="newDateTime" 
-                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                               class="date-picker" 
                                required>
                     </div>
                     <div class="flex justify-end gap-4">
@@ -144,7 +226,7 @@
         </div>
     </div>
 
-    <!-- Modal for adding new trip -->
+    <!-- Add Trip Modal -->
     <div id="addTripModal" class="hidden fixed inset-0 z-50">
         <div class="modal-overlay absolute inset-0"></div>
         <div class="fixed inset-0 flex items-center justify-center">
@@ -182,7 +264,7 @@
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-clock ml-2"></i>תאריך ושעה
+                            <i class="fas fa-calendar-alt ml-2"></i>תאריך ושעה
                         </label>
                         <input type="datetime-local" name="date_time" required
                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
@@ -230,48 +312,6 @@
         </button>
     </div>
 
-    <!-- Edit Trip Modal -->
-    <div id="editTripModal" class="hidden fixed inset-0 z-50">
-        <div class="modal-overlay absolute inset-0"></div>
-        <div class="fixed inset-0 flex items-center justify-center">
-            <div class="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
-                <h3 class="text-xl font-bold mb-4">עריכת נסיעה</h3>
-                <form id="editTripForm" class="space-y-4">
-                    <input type="hidden" id="editTripId">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-clock ml-2"></i>תאריך ושעת התחלה
-                        </label>
-                        <input type="datetime-local" 
-                               id="editStartTime" 
-                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                               required>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-clock ml-2"></i>תאריך ושעת סיום
-                        </label>
-                        <input type="datetime-local" 
-                               id="editEndTime" 
-                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                               required>
-                    </div>
-                    <div class="flex justify-end gap-4">
-                        <button type="button" 
-                                onclick="closeEditTripModal()"
-                                class="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-50 transition-colors">
-                            ביטול
-                        </button>
-                        <button type="submit"
-                                class="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
-                            עדכן נסיעה
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <script>
         const VEHICLES = {
             'car1': 'יונדאי איוניק - 53836402',
@@ -282,67 +322,91 @@
         async function loadTrips() {
             try {
                 const response = await fetch('/admin/get_trips');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const trips = await response.json();
+                const data = await response.json();
                 
-                if (!Array.isArray(trips)) {
-                    throw new Error('Invalid response format');
-                }
+                // Update stats
+                const stats = {
+                    pending: data.filter(t => t.status === 'pending').length,
+                    approved: data.filter(t => t.status === 'approved').length,
+                    total: data.length
+                };
 
-                // ניקוי הרשימות הקיימות
-                const pendingTripsContainer = document.getElementById('pendingTrips');
-                const approvedTripsContainer = document.getElementById('approvedTrips');
-                const rejectedTripsContainer = document.getElementById('rejectedTrips');
-                
-                pendingTripsContainer.innerHTML = '';
-                approvedTripsContainer.innerHTML = '';
-                rejectedTripsContainer.innerHTML = '';
-                
-                // מיון הנסיעות לפי תאריך (חדש לישן)
-                trips.sort((a, b) => {
-                    const aTime = getEffectiveStartTime(a);
-                    const bTime = getEffectiveStartTime(b);
-                    return new Date(bTime) - new Date(aTime);
-                });
-                
-                // הצגת הנסיעות בקטגוריות המתאימות
-                let pendingCount = 0;
-                let approvedCount = 0;
-                let rejectedCount = 0;
-                
-                trips.forEach(trip => {
-                    if (trip.status === 'pending') {
-                        displayTrip(trip, pendingTripsContainer);
-                        pendingCount++;
-                    } else if (trip.status === 'approved') {
-                        displayTrip(trip, approvedTripsContainer);
-                        approvedCount++;
-                    } else if (trip.status === 'rejected') {
-                        displayTrip(trip, rejectedTripsContainer);
-                        rejectedCount++;
-                    }
-                });
-                
-                // עדכון הכותרות עם מספר הנסיעות
-                document.getElementById('pendingCount').textContent = pendingCount;
-                document.getElementById('approvedCount').textContent = approvedCount;
-                document.getElementById('rejectedCount').textContent = rejectedCount;
+                document.getElementById('pendingCount').textContent = stats.pending;
+                document.getElementById('approvedCount').textContent = stats.approved;
+                document.getElementById('totalCount').textContent = stats.total;
+
+                // Render pending trips
+                const pendingTrips = data.filter(t => t.status === 'pending');
+                document.getElementById('pendingTrips').innerHTML = pendingTrips.map((trip, index) => `
+                    <div class="trip-card glass-card rounded-xl p-6 slide-in" style="animation-delay: ${index * 0.1}s">
+                        <div class="flex justify-between items-start">
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(trip.driver_name)}&background=random" 
+                                         class="w-10 h-10 rounded-full">
+                                    <div>
+                                        <div class="font-medium">${trip.driver_name}</div>
+                                        <div class="text-sm text-gray-500">${VEHICLES[trip.vehicle]}</div>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-50 p-3 rounded-lg">
+                                    <div class="text-sm text-gray-600">${trip.purpose}</div>
+                                    <div class="mt-2 text-sm font-medium">
+                                        <i class="far fa-calendar ml-1"></i>${formatDateTime(trip.date_time)}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <button onclick="approveTrip('${trip._id}')"
+                                        class="px-4 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors">
+                                    <i class="fas fa-check ml-1"></i>אשר
+                                </button>
+                                <button onclick="showRejectModal('${trip._id}')"
+                                        class="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">
+                                    <i class="fas fa-times ml-1"></i>דחה
+                                </button>
+                                <button onclick="showRescheduleModal('${trip._id}', '${trip.date_time}')"
+                                        class="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">
+                                    <i class="fas fa-clock ml-1"></i>שנה מועד
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('') || '<div class="text-center text-gray-500 py-8">אין נסיעות ממתינות</div>';
+
+                // Render approved trips
+                const approvedTrips = data
+                    .filter(t => t.status === 'approved')
+                    .sort((a, b) => new Date(a.date_time) - new Date(b.date_time));
+
+                    document.getElementById('approvedTrips').innerHTML = approvedTrips.map((trip, index) => `
+    <div class="trip-card glass-card rounded-xl p-6 slide-in" style="animation-delay: ${index * 0.1}s">
+        <div class="flex justify-between items-center">
+            <div class="flex gap-4">
+                <div class="bg-green-100 p-2 rounded-lg">
+                    <i class="fas fa-check text-green-600"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <img src="https://ui-avatars.com/api/?name=${encodeURIComponent(trip.driver_name)}&background=random" 
+                             class="w-8 h-8 rounded-full">
+                        <div class="font-medium">${trip.driver_name}</div>
+                    </div>
+                    <div class="text-sm text-gray-500">${VEHICLES[trip.vehicle]}</div>
+                    <div class="mt-2 text-sm text-gray-600">${trip.purpose}</div>
+                </div>
+            </div>
+            <div class="text-sm text-gray-700">
+                <i class="far fa-calendar ml-1"></i>
+                ${formatDateTime(trip.date_time)}
+            </div>
+        </div>
+    </div>
+`).join('') || '<div class="text-center text-gray-500 py-8">אין נסיעות מאושרות</div>';
 
             } catch (error) {
                 console.error('Error loading trips:', error);
-                alert('אירעה שגיאה בטעינת הנסיעות');
-                
-                // ניקוי הרשימות במקרה של שגיאה
-                document.getElementById('pendingTrips').innerHTML = '';
-                document.getElementById('approvedTrips').innerHTML = '';
-                document.getElementById('rejectedTrips').innerHTML = '';
-                
-                // איפוס הספירות
-                document.getElementById('pendingCount').textContent = '0';
-                document.getElementById('approvedCount').textContent = '0';
-                document.getElementById('rejectedCount').textContent = '0';
+                showNotification('אירעה שגיאה בטעינת הנסיעות', 'error');
             }
         }
 
@@ -380,25 +444,8 @@
         }
 
         async function approveTrip(tripId) {
-            try {
-                const response = await fetch('/admin/approve_trip', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ trip_id: tripId })
-                });
-
-                const data = await response.json();
-                if (data.status === 'success') {
-                    showNotification('הנסיעה אושרה בהצלחה', 'success');
-                    loadTrips();
-                } else {
-                    showNotification(data.message || 'אירעה שגיאה באישור הנסיעה', 'error');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showNotification('אירעה שגיאה באישור הנסיעה', 'error');
+            if (await updateTripStatus(tripId, 'approved')) {
+                alert('הנסיעה אושרה בהצלחה');
             }
         }
 
@@ -418,40 +465,16 @@
             const tripId = document.getElementById('rejectTripId').value;
             const rejectionReason = document.getElementById('rejectionReason').value;
             
-            if (!rejectionReason) {
-                showNotification('נא להזין סיבת דחייה', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch('/admin/reject_trip', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        trip_id: tripId,
-                        rejection_reason: rejectionReason
-                    })
-                });
-
-                const data = await response.json();
-                if (data.status === 'success') {
-                    showNotification('הנסיעה נדחתה בהצלחה', 'success');
-                    closeRejectModal();
-                    loadTrips();
-                } else {
-                    showNotification(data.message || 'אירעה שגיאה בדחיית הנסיעה', 'error');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showNotification('אירעה שגיאה בדחיית הנסיעה', 'error');
+            if (await updateTripStatus(tripId, 'rejected', rejectionReason)) {
+                closeRejectModal();
+                alert('הנסיעה נדחתה בהצלחה');
             }
         });
 
-        // פונקציות שינוי מועד
-        function showRescheduleModal(tripId) {
+        // Reschedule trip
+        function showRescheduleModal(tripId, currentDateTime) {
             document.getElementById('rescheduleTripId').value = tripId;
+            document.getElementById('newDateTime').value = currentDateTime.split('.')[0];
             document.getElementById('rescheduleModal').classList.remove('hidden');
         }
 
@@ -465,34 +488,32 @@
             const tripId = document.getElementById('rescheduleTripId').value;
             const newDateTime = document.getElementById('newDateTime').value;
 
-            if (!newDateTime) {
-                showNotification('נא להזין מועד חדש', 'error');
-                return;
-            }
-
             try {
+                console.log('Rescheduling trip:', { tripId, newDateTime });
                 const response = await fetch('/admin/reschedule_trip', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        trip_id: tripId,
+                        _id: tripId,
                         new_date_time: newDateTime
                     })
                 });
 
                 const data = await response.json();
+                console.log('Server response:', data);
+                
                 if (data.status === 'success') {
-                    showNotification('מועד הנסיעה עודכן בהצלחה', 'success');
                     closeRescheduleModal();
-                    loadTrips();
+                    alert('מועד הנסיעה עודכן בהצלחה');
+                    await loadTrips();
                 } else {
-                    showNotification(data.message || 'אירעה שגיאה בעדכון מועד הנסיעה', 'error');
+                    alert(data.message || 'אירעה שגיאה בעדכון מועד הנסיעה');
                 }
             } catch (error) {
-                console.error('Error:', error);
-                showNotification('אירעה שגיאה בעדכון מועד הנסיעה', 'error');
+                console.error('Error rescheduling trip:', error);
+                alert('אירעה שגיאה בעדכון מועד הנסיעה');
             }
         });
 
@@ -513,56 +534,12 @@
             setTimeout(() => notification.remove(), 3000);
         }
 
-        function formatDateTime(dateTimeStr) {
-            if (!dateTimeStr) return 'לא צוין';
-            const date = new Date(dateTimeStr);
-            if (isNaN(date.getTime())) return 'תאריך לא תקין';
-            return date.toLocaleString('he-IL', { 
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-
-        function getEffectiveStartTime(trip) {
-            return trip.start_time || trip.date_time || null;
-        }
-
-        function displayTrip(trip, container) {
-            const tripElement = document.createElement('div');
-            tripElement.className = 'bg-white rounded-lg shadow-md p-4 mb-4';
-            
-            const startTime = getEffectiveStartTime(trip);
-            const endTime = trip.end_time;
-            
-            tripElement.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <div>
-                        <h3 class="text-lg font-semibold mb-2">${trip.driver_name}</h3>
-                        <p class="text-gray-600">רכב: ${trip.vehicle}</p>
-                        <p class="text-gray-600">יעד: ${trip.destination}</p>
-                        <p class="text-gray-600">מטרה: ${trip.purpose}</p>
-                        <p class="text-gray-600">שעת התחלה: ${formatDateTime(startTime)}</p>
-                        ${endTime ? `<p class="text-gray-600">שעת סיום: ${formatDateTime(endTime)}</p>` : ''}
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        ${trip.status === 'pending' ? `
-                            <button onclick="approveTrip('${trip._id}')" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">אשר</button>
-                            <button onclick="showRejectModal('${trip._id}')" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">דחה</button>
-                        ` : trip.status === 'approved' ? `
-                            <button onclick="showEditModal('${trip._id}', '${startTime}', '${endTime || ''}')" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">ערוך</button>
-                            <span class="text-green-500 font-semibold">מאושר</span>
-                        ` : `
-                            <span class="text-red-500 font-semibold">נדחה</span>
-                            <p class="text-gray-500">סיבה: ${trip.rejection_reason || 'לא צוינה סיבה'}</p>
-                        `}
-                    </div>
-                </div>
-            `;
-            
-            container.appendChild(tripElement);
+        function formatDateTime(dateStr) {
+            const date = new Date(dateStr);
+            return new Intl.DateTimeFormat('he-IL', {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+            }).format(date);
         }
 
         // Load trips on page load
@@ -638,7 +615,7 @@
                 if (response.ok) {
                     showNotification('הנסיעה נוספה בהצלחה', 'success');
                     closeAddTripModal();
-                    loadTrips();
+                    loadTrips();  // רענון רשימת הנסיעות
                 } else {
                     throw new Error(result.message || 'אירעה שגיאה בהוספת הנסיעה');
                 }
@@ -647,165 +624,6 @@
             } finally {
                 submitButton.disabled = false;
                 submitButton.innerHTML = originalContent;
-            }
-        });
-
-        function submitAdminAddTrip() {
-            const form = document.getElementById('adminAddTripForm');
-            const formData = new FormData(form);
-            const data = Object.fromEntries(formData.entries());
-            
-            fetch('/admin/add_trip', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    showAlert('success', data.message);
-                    $('#addTripModal').modal('hide');
-                    form.reset();
-                    loadTrips();
-                } else {
-                    showAlert('danger', data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showAlert('danger', 'אירעה שגיאה בהוספת הנסיעה');
-            });
-        }
-
-        // עדכון פונקציית החיפוש
-        function searchTrips() {
-            const searchData = {
-                date_from: document.getElementById('searchDateFrom').value,
-                date_to: document.getElementById('searchDateTo').value,
-                driver_id: document.getElementById('searchDriver').value,
-                status: document.getElementById('searchStatus').value
-            };
-
-            fetch('/admin/search_trips', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(searchData)
-            })
-            .then(response => response.json())
-            .then(trips => {
-                displayTrips(trips);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showAlert('danger', 'אירעה שגיאה בחיפוש הנסיעות');
-            });
-        }
-
-        function displayTrip(trip) {
-            return `
-            <div class="trip-card bg-white rounded-lg shadow-sm p-6 hover:shadow-md transition-shadow">
-                <div class="flex justify-between items-start">
-                    <div class="space-y-4">
-                        <div class="flex items-center gap-3">
-                            <div class="bg-blue-100 p-2 rounded-lg">
-                                <i class="fas fa-car text-blue-600"></i>
-                            </div>
-                            <div>
-                                <div class="font-medium">${VEHICLES[trip.vehicle] || trip.vehicle}</div>
-                                <div class="text-sm text-gray-500">
-                                    <div><i class="fas fa-play ml-1"></i>התחלה: ${formatDateTime(trip.start_time)}</div>
-                                    <div><i class="fas fa-stop ml-1"></i>סיום: ${formatDateTime(trip.end_time)}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div>
-                            <div class="text-sm text-gray-600">
-                                <span class="font-medium">נהג:</span> ${trip.driver_name}
-                            </div>
-                            <div class="text-sm text-gray-600">
-                                <span class="font-medium">מטרה:</span> ${trip.purpose}
-                            </div>
-                            <div class="text-sm text-gray-600">
-                                <span class="font-medium">יעד:</span> ${trip.destination}
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex flex-col items-end gap-2">
-                        <div class="status-badge ${getStatusBadgeClass(trip.status)} px-3 py-1 rounded-full text-sm">
-                            ${getStatusText(trip.status)}
-                        </div>
-                        ${trip.status === 'pending' ? `
-                            <div class="flex gap-2">
-                                <button onclick="approveTrip('${trip._id}')" 
-                                        class="btn-approve bg-green-100 text-green-700 hover:bg-green-200 px-3 py-1 rounded-full text-sm">
-                                    <i class="fas fa-check"></i>
-                                    אישור
-                                </button>
-                                <button onclick="showRejectModal('${trip._id}')"
-                                        class="btn-reject bg-red-100 text-red-700 hover:bg-red-200 px-3 py-1 rounded-full text-sm">
-                                    <i class="fas fa-times"></i>
-                                    דחייה
-                                </button>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            </div>
-            `;
-        }
-
-        // Edit Trip Functions
-        function showEditTripModal(tripId, startTime, endTime) {
-            document.getElementById('editTripId').value = tripId;
-            document.getElementById('editStartTime').value = startTime ? startTime.split('.')[0] : '';
-            document.getElementById('editEndTime').value = endTime ? endTime.split('.')[0] : '';
-            document.getElementById('editTripModal').classList.remove('hidden');
-        }
-
-        function closeEditTripModal() {
-            document.getElementById('editTripModal').classList.add('hidden');
-            document.getElementById('editTripForm').reset();
-        }
-
-        document.getElementById('editTripForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const tripId = document.getElementById('editTripId').value;
-            const startTime = document.getElementById('editStartTime').value;
-            const endTime = document.getElementById('editEndTime').value;
-
-            if (!startTime || !endTime) {
-                showNotification('נא להזין מועדי התחלה וסיום', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch('/admin/edit_trip', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        trip_id: tripId,
-                        start_time: startTime,
-                        end_time: endTime
-                    })
-                });
-
-                const data = await response.json();
-                if (data.status === 'success') {
-                    showNotification('הנסיעה עודכנה בהצלחה', 'success');
-                    closeEditTripModal();
-                    loadTrips();
-                } else {
-                    showNotification(data.message || 'אירעה שגיאה בעדכון הנסיעה', 'error');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showNotification('אירעה שגיאה בעדכון הנסיעה', 'error');
             }
         });
     </script>
