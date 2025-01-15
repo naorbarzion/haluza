@@ -124,17 +124,9 @@
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-clock ml-2"></i>תאריך ושעת התחלה
+                            <i class="fas fa-calendar-alt ml-2"></i>תאריך ושעה
                         </label>
-                        <input type="datetime-local" name="start_time" required
-                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-shadow">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-clock ml-2"></i>תאריך ושעת סיום
-                        </label>
-                        <input type="datetime-local" name="end_time" required
+                        <input type="datetime-local" name="date_time" required
                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-shadow">
                     </div>
                 </div>
@@ -250,38 +242,114 @@
                     </div>
                     <div>
                         <div class="font-medium text-lg">${VEHICLES[trip.vehicle] || trip.vehicle}</div>
-                        <div class="text-gray-500 text-sm">
-                            <div><i class="fas fa-play ml-1"></i>התחלה: ${formatDateTime(trip.start_time)}</div>
-                            <div><i class="fas fa-stop ml-1"></i>סיום: ${formatDateTime(trip.end_time)}</div>
-                        </div>
+                        <div class="text-gray-500 text-sm">${formatDateTime(trip.date_time)}</div>
                     </div>
                 </div>
                 <div class="bg-gray-50 p-3 rounded-lg space-y-2">
                     <div>
                         <span class="font-medium text-gray-700">מטרת הנסיעה:</span>
-                        <span class="text-gray-600">${trip.purpose}</span>
+                        <div class="text-gray-600">${trip.purpose}</div>
                     </div>
                     <div>
-                        <span class="font-medium text-gray-700">יעד:</span>
-                        <span class="text-gray-600">${trip.destination}</span>
+                        <span class="font-medium text-gray-700">יעד הנסיעה:</span>
+                        <div class="text-gray-600">${trip.destination || 'לא צוין'}</div>
                     </div>
                 </div>
             </div>
-            <div class="status-badge ${getStatusBadgeClass(trip.status)} px-3 py-1 rounded-full text-sm font-medium">
-                ${getStatusText(trip.status)}
+            <div class="flex flex-col items-end gap-2">
+                <div class="status-badge px-4 py-2 rounded-full text-sm font-medium ${getStatusBadgeClass(trip.status)}">
+                    ${getStatusIcon(trip.status)}
+                    <span class="mr-1">${getStatusText(trip.status)}</span>
+                </div>
+                ${trip.created_at ? `
+                    <div class="text-xs text-gray-400">
+                        <i class="far fa-clock ml-1"></i>
+                        נוצר ב-${formatDateTime(trip.created_at)}
+                    </div>
+                ` : ''}
             </div>
         </div>
         ${trip.rejection_reason ? `
-            <div class="mt-4 bg-red-50 text-red-700 p-3 rounded-lg">
-                <span class="font-medium">סיבת דחייה:</span> ${trip.rejection_reason}
+            <div class="mt-4 bg-red-50 p-4 rounded-lg border border-red-100">
+                <div class="flex items-center gap-2 text-red-600">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span class="font-medium">סיבת דחייה:</span>
+                </div>
+                <div class="mt-1 text-red-600">${trip.rejection_reason}</div>
             </div>
         ` : ''}
     </div>
 `).join('') || '<div class="text-center text-gray-500 py-8">אין נסיעות להצגה</div>';
             } catch (error) {
-                showNotification(error.message, 'error');
+                console.error('Error loading trips:', error);
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <div class="bg-red-100 text-red-600 p-4 rounded-lg inline-flex items-center gap-2">
+                            <i class="fas fa-exclamation-circle"></i>
+                            אירעה שגיאה בטעינת הנסיעות
+                        </div>
+                    </div>
+                `;
             }
         }
-    </script>
+
+        // Show notification function
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            notification.className = `notification fixed top-4 left-4 p-4 rounded-lg shadow-lg z-50 flex items-center gap-3
+                ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+            
+            notification.innerHTML = `
+                <div class="${type === 'success' ? 'bg-green-200' : 'bg-red-200'} p-2 rounded">
+                    <i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}-circle"></i>
+                </div>
+                <div class="font-medium">${message}</div>
+            `;
+            
+            document.body.appendChild(notification);
+            setTimeout(() => {
+                notification.style.transition = 'all 0.5s ease-out';
+                notification.style.transform = 'translateX(-100%)';
+                notification.style.opacity = '0';
+                setTimeout(() => notification.remove(), 500);
+            }, 3000);
+        }
+
+        // Helper functions
+        function formatDateTime(dateStr) {
+            const date = new Date(dateStr);
+            return new Intl.DateTimeFormat('he-IL', {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+            }).format(date);
+        }
+
+        function getStatusBadgeClass(status) {
+            return {
+                'pending': 'bg-yellow-100 text-yellow-800',
+                'approved': 'bg-green-100 text-green-800',
+                'rejected': 'bg-red-100 text-red-800'
+            }[status] || 'bg-gray-100 text-gray-800';
+        }
+
+        function getStatusIcon(status) {
+            return {
+                'pending': '<i class="fas fa-clock"></i>',
+                'approved': '<i class="fas fa-check"></i>',
+                'rejected': '<i class="fas fa-times"></i>'
+            }[status] || '<i class="fas fa-question"></i>';
+        }
+
+        function getStatusText(status) {
+    return {
+        'pending': 'ממתין לאישור',
+        'approved': 'מאושר',
+        'rejected': 'נדחה'
+    }[status] || status;
+}
+
+// Load trips on page load
+document.addEventListener('DOMContentLoaded', loadTrips);
+</script>
 </body>
 </html>
