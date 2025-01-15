@@ -911,5 +911,77 @@ def approve_trip():
             "message": f"שגיאה באישור הנסיעה: {str(e)}"
         }), 500
 
+@app.route('/admin/edit_trip', methods=['POST'])
+@login_required
+@admin_required
+def edit_trip():
+    try:
+        data = request.json
+        trip_id = data.get('trip_id')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+        
+        if not trip_id:
+            return jsonify({"status": "error", "message": "לא התקבל מזהה נסיעה"}), 400
+            
+        if not start_time or not end_time:
+            return jsonify({"status": "error", "message": "חובה להזין מועד התחלה ומועד סיום"}), 400
+        
+        # עדכון הנסיעה
+        result = db.trips.update_one(
+            {'_id': ObjectId(trip_id)},
+            {
+                '$set': {
+                    'date_time': start_time,
+                    'end_time': end_time,
+                    'updated_at': datetime.utcnow(),
+                    'updated_by': ObjectId(session['user_id'])
+                }
+            }
+        )
+        
+        if result.modified_count == 0:
+            return jsonify({"status": "error", "message": "הנסיעה לא נמצאה או לא עודכנה"}), 404
+        
+        # שליפת הנסיעה המעודכנת
+        trip = db.trips.find_one({'_id': ObjectId(trip_id)})
+        if not trip:
+            return jsonify({"status": "error", "message": "הנסיעה לא נמצאה"}), 404
+            
+        # הכנת אובייקט התגובה
+        response_trip = {
+            '_id': str(trip['_id']),
+            'user_id': str(trip['user_id']),
+            'vehicle': trip['vehicle'],
+            'date_time': trip['date_time'],
+            'end_time': trip['end_time'],
+            'purpose': trip['purpose'],
+            'destination': trip['destination'],
+            'status': trip['status']
+        }
+        
+        if 'created_at' in trip:
+            response_trip['created_at'] = trip['created_at'].isoformat()
+        if 'updated_at' in trip:
+            response_trip['updated_at'] = trip['updated_at'].isoformat()
+            
+        # הוספת שם הנהג
+        driver = db.users.find_one({'_id': trip['user_id']})
+        response_trip['driver_name'] = driver['full_name'] if driver else 'לא ידוע'
+        
+        logger.info(f"Successfully edited trip {trip_id}")
+        return jsonify({
+            "status": "success",
+            "message": "הנסיעה עודכנה בהצלחה",
+            "trip": response_trip
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in edit_trip: {str(e)}")
+        return jsonify({
+            "status": "error", 
+            "message": f"שגיאה בעדכון הנסיעה: {str(e)}"
+        }), 500
+
 if __name__ == '__main__':
     app.run(debug=False)  # שינוי ל-False בסביבת ייצור
