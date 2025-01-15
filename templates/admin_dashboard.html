@@ -579,12 +579,44 @@
             setTimeout(() => notification.remove(), 3000);
         }
 
+        // פונקציית עזר לפורמט תאריכים
         function formatDateTime(dateStr) {
-            const date = new Date(dateStr);
-            return new Intl.DateTimeFormat('he-IL', {
-                dateStyle: 'medium',
-                timeStyle: 'short'
-            }).format(date);
+            try {
+                if (!dateStr) return 'לא צוין';
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return 'תאריך לא תקין';
+                
+                return new Intl.DateTimeFormat('he-IL', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short'
+                }).format(date);
+            } catch (error) {
+                console.error('Error formatting date:', error, dateStr);
+                return 'תאריך לא תקין';
+            }
+        }
+
+        // פונקציית עזר לחישוב משך הנסיעה
+        function calculateDuration(start, end) {
+            try {
+                if (!start || !end) return 'לא צוין';
+                const startTime = new Date(start);
+                const endTime = new Date(end);
+                
+                if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+                    return 'לא ניתן לחשב';
+                }
+                
+                const diff = (endTime - startTime) / (1000 * 60); // הפרש בדקות
+                
+                const hours = Math.floor(diff / 60);
+                const minutes = Math.floor(diff % 60);
+                
+                return `${hours} שעות ו-${minutes} דקות`;
+            } catch (error) {
+                console.error('Error calculating duration:', error, {start, end});
+                return 'לא ניתן לחשב';
+            }
         }
 
         // Load trips on page load
@@ -671,19 +703,6 @@
                 submitButton.innerHTML = originalContent;
             }
         });
-
-        // פונקציית עזר לחישוב משך הנסיעה
-        function calculateDuration(start, end) {
-            if (!start || !end) return 'לא צוין';
-            const startTime = new Date(start);
-            const endTime = new Date(end);
-            const diff = (endTime - startTime) / (1000 * 60); // הפרש בדקות
-            
-            const hours = Math.floor(diff / 60);
-            const minutes = Math.floor(diff % 60);
-            
-            return `${hours} שעות ו-${minutes} דקות`;
-        }
 
         // פונקציית עזר להמרת קוד רכב לשם מלא
         function getVehicleName(vehicleCode) {
