@@ -124,9 +124,19 @@
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
-                            <i class="fas fa-calendar-alt ml-2"></i>תאריך ושעה
+                            <i class="fas fa-calendar-alt ml-2"></i>תאריך ושעת התחלה
                         </label>
                         <input type="datetime-local" name="date_time" required
+                               id="start_time"
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-shadow">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar-check ml-2"></i>תאריך ושעת סיום
+                        </label>
+                        <input type="datetime-local" name="end_time" required
+                               id="end_time"
                                class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500 transition-shadow">
                     </div>
                 </div>
@@ -184,6 +194,15 @@
 
         // Handle form submission
         document.getElementById('tripForm').addEventListener('submit', async function(e) {
+            const startTime = new Date(document.getElementById('start_time').value);
+            const endTime = new Date(document.getElementById('end_time').value);
+            
+            if (endTime <= startTime) {
+                e.preventDefault();
+                alert('שעת הסיום חייבת להיות מאוחרת משעת ההתחלה');
+                return;
+            }
+            
             e.preventDefault();
             const submitButton = this.querySelector('button[type="submit"]');
             const originalContent = submitButton.innerHTML;
@@ -246,6 +265,16 @@
                     </div>
                 </div>
                 <div class="bg-gray-50 p-3 rounded-lg space-y-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-clock text-blue-600"></i>
+                        <div>
+                            <div class="text-sm text-gray-600">התחלה: ${formatDateTime(trip.date_time)}</div>
+                            <div class="text-sm text-gray-600">סיום: ${formatDateTime(trip.end_time)}</div>
+                            <div class="text-sm font-medium text-blue-600">
+                                משך מתוכנן: ${calculateDuration(trip.date_time, trip.end_time)}
+                            </div>
+                        </div>
+                    </div>
                     <div>
                         <span class="font-medium text-gray-700">מטרת הנסיעה:</span>
                         <div class="text-gray-600">${trip.purpose}</div>
@@ -346,6 +375,17 @@
         'approved': 'מאושר',
         'rejected': 'נדחה'
     }[status] || status;
+}
+
+function calculateDuration(start, end) {
+    const startTime = new Date(start);
+    const endTime = new Date(end);
+    const diff = (endTime - startTime) / (1000 * 60); // הפרש בדקות
+    
+    const hours = Math.floor(diff / 60);
+    const minutes = Math.floor(diff % 60);
+    
+    return `${hours} שעות ו-${minutes} דקות`;
 }
 
 // Load trips on page load
