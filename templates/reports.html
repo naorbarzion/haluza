@@ -579,7 +579,7 @@
                         
                         <!-- סטטוס -->
                         <div class="flex items-center gap-2">
-                            <div class="text-sm font-medium ${getStatusColor(trip.status)}">
+                            <div class="text-sm font-medium ${getStatusBadgeClass(trip.status)}">
                                 ${getStatusText(trip.status)}
                             </div>
                             ${trip.rejection_reason ? `
