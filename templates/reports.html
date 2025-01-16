@@ -322,6 +322,17 @@
     // חיפוש והצגת נסיעות
     async function searchTrips() {
         try {
+            // נוסיף אינדיקציה שהחיפוש מתבצע
+            const container = document.getElementById('tripsContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="flex justify-center items-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span class="mr-3">טוען נסיעות...</span>
+                    </div>
+                `;
+            }
+
             const formData = {
                 driver_id: document.getElementById('driverSelect')?.value || '',
                 vehicle: document.getElementById('vehicleSelect')?.value || '',
@@ -343,32 +354,53 @@
             }
 
             const trips = await response.json();
+            
+            // נוסיף לוג לבדיקת הנתונים שהתקבלו
+            console.log('Received trips:', trips);
+            
             displayTrips(trips);
             
-            // עדכון הקלנדר אם קיים
-            if (typeof updateCalendar === 'function') {
-                updateCalendar(trips);
-            }
+            // עדכון הקלנדר
+            updateCalendar(trips);
+            
         } catch (error) {
             console.error('Error searching trips:', error);
+            // נציג הודעת שגיאה במכל
+            const container = document.getElementById('tripsContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div class="text-center text-red-500 py-8">
+                        <i class="fas fa-exclamation-circle text-xl mb-2"></i>
+                        <div>אירעה שגיאה בטעינת הנסיעות</div>
+                        <div class="text-sm">${error.message}</div>
+                    </div>
+                `;
+            }
             showNotification(error.message, 'error');
         }
     }
 
     // עדכון הקלנדר
     function updateCalendar(trips) {
+        if (!calendar) return;
+        
+        // נקה את כל האירועים הקיימים
         calendar.removeAllEvents();
         
+        // הוסף את הנסיעות כאירועים
         const events = trips.map(trip => ({
-            id: trip.id,
-            title: `${trip.driver_name} - ${getVehicleName(trip.vehicle)}`,
+            id: trip._id,
+            title: `${trip.driver_name} - ${trip.purpose}`,
             start: trip.date_time,
-            allDay: false,
-            status: trip.status,
+            end: trip.end_time,
             extendedProps: {
-                ...trip,
-                vehicleName: getVehicleName(trip.vehicle)
-            }
+                vehicle: trip.vehicle,
+                purpose: trip.purpose,
+                destination: trip.destination,
+                status: trip.status,
+                rejection_reason: trip.rejection_reason
+            },
+            className: getStatusBadgeClass(trip.status)
         }));
         
         calendar.addEventSource(events);
@@ -452,9 +484,9 @@
     // Helper Functions
     function getVehicleName(vehicleCode) {
         const vehicles = {
-            'car1': 'טויוטה קורולה - 12-345-67',
-            'car2': 'יונדאי i35 - 23-456-78',
-            'car3': 'סקודה אוקטביה - 34-567-89'
+            'car1': 'יונדאי איוניק - 53836402',
+            'car2': 'טויוטה סיטי - 15093804',
+            'car3': 'מרצדס בנץ - 19826603'
         };
         return vehicles[vehicleCode] || vehicleCode;
     }
