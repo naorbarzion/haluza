@@ -200,20 +200,6 @@
             </form>
         </div>
 
-        <!-- Results Section -->
-        <div class="glass-effect rounded-2xl shadow-lg p-8 mb-8 fade-in">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="bg-blue-100 p-3 rounded-lg">
-                    <i class="fas fa-list text-blue-600 text-xl"></i>
-                </div>
-                <h2 class="text-2xl font-bold">רשימת נסיעות</h2>
-            </div>
-            
-            <div id="tripsContainer" class="space-y-4">
-                <!-- הנסיעות יוצגו כאן -->
-            </div>
-        </div>
-
         <!-- Calendar Section -->
         <div class="glass-effect rounded-2xl shadow-lg p-8 fade-in">
             <div class="flex items-center gap-3 mb-6">
@@ -520,31 +506,46 @@
         }
 
         function formatDateTime(dateStr) {
-            if (!dateStr) return 'לא צוין';
+            if (!dateStr || typeof dateStr !== 'string') {
+                // אם זה אובייקט Date
+                if (dateStr instanceof Date) {
+                    return new Intl.DateTimeFormat('he-IL', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }).format(dateStr);
+                }
+                return 'לא צוין';
+            }
+
             try {
-                // אם התאריך מגיע בפורמט dd/mm/yyyy
+                // מנקה רווחים מיותרים
+                dateStr = dateStr.trim();
+                
+                // אם התאריך בפורמט dd/mm/yyyy HH:MM
                 if (dateStr.includes('/')) {
-                    const [day, month, year, time] = dateStr.split(/[/ ]/);
-                    return `${day}/${month}/${year} ${time || ''}`.trim();
+                    const [datePart, timePart] = dateStr.split(' ');
+                    const [day, month, year] = datePart.split('/');
+                    return `${day}/${month}/${year} ${timePart || ''}`.trim();
                 }
                 
-                // אם התאריך מגיע בפורמט yyyy-mm-dd
+                // אם התאריך בפורמט ISO או yyyy-mm-dd
                 const date = new Date(dateStr);
-                if (isNaN(date.getTime())) {
-                    // אם התאריך לא תקין, נחזיר כמו שהוא
-                    return dateStr;
+                if (!isNaN(date.getTime())) {
+                    return new Intl.DateTimeFormat('he-IL', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    }).format(date);
                 }
                 
-                return new Intl.DateTimeFormat('he-IL', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }).format(date);
+                return dateStr; // אם לא הצלחנו לפרסר, נחזיר כמו שהוא
             } catch (error) {
-                console.error('Error formatting date:', error);
-                // אם יש שגיאה, נחזיר את התאריך המקורי
+                console.error('Error formatting date:', error, dateStr);
                 return dateStr;
             }
         }
@@ -681,6 +682,17 @@
             if (!dateStr) return null;
             
             try {
+                // אם זה כבר אובייקט Date
+                if (dateStr instanceof Date) {
+                    return dateStr;
+                }
+
+                // אם זה לא סטרינג, ננסה להמיר ל-Date
+                if (typeof dateStr !== 'string') {
+                    const date = new Date(dateStr);
+                    return isNaN(date.getTime()) ? null : date;
+                }
+                
                 // מנקה רווחים מיותרים
                 dateStr = dateStr.trim();
                 
@@ -692,23 +704,12 @@
                     return new Date(year, month - 1, day, hours || 0, minutes || 0);
                 }
                 
-                // אם התאריך בפורמט ISO עם T
-                if (dateStr.includes('T')) {
-                    return new Date(dateStr);
-                }
-                
-                // אם התאריך בפורמט yyyy-mm-dd HH:MM:SS
-                const dateTimeRegex = /(\d{4})-(\d{2})-(\d{2})(?:T|\s)(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?/;
-                const match = dateStr.match(dateTimeRegex);
-                if (match) {
-                    const [_, year, month, day, hours, minutes, seconds] = match;
-                    return new Date(year, month - 1, day, hours, minutes, seconds || 0);
-                }
-                
-                // אם התאריך בפורמט yyyy-mm-dd
-                if (dateStr.includes('-')) {
-                    const [year, month, day] = dateStr.split('-');
-                    return new Date(year, month - 1, day);
+                // אם התאריך בפורמט ISO או כולל T
+                if (dateStr.includes('T') || dateStr.includes('-')) {
+                    const date = new Date(dateStr);
+                    if (!isNaN(date.getTime())) {
+                        return date;
+                    }
                 }
                 
                 throw new Error(`Invalid date format: ${dateStr}`);
