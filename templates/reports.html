@@ -480,35 +480,49 @@
         // ייצוא לאקסל
         async function exportToExcel() {
             try {
+                const formData = {
+                    driver_id: document.getElementById('driverSelect')?.value || '',
+                    vehicle: document.getElementById('vehicleSelect')?.value || '',
+                    status: document.getElementById('statusSelect')?.value || '',
+                    start_date: document.getElementById('startDate')?.value || '',
+                    end_date: document.getElementById('endDate')?.value || ''
+                };
+
                 const response = await fetch('/admin/export_trips', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        driver_id: document.getElementById('driverSelect')?.value || '',
-                        vehicle: document.getElementById('vehicleSelect')?.value || '',
-                        status: document.getElementById('statusSelect')?.value || '',
-                        start_date: document.getElementById('startDate')?.value || '',
-                        end_date: document.getElementById('endDate')?.value || ''
-                    })
+                    body: JSON.stringify(formData)
                 });
 
-                if (!response.ok) throw new Error('שגיאה בייצוא הנתונים');
+                if (!response.ok) {
+                    throw new Error('שגיאה בייצוא הנסיעות');
+                }
 
-                const trips = await response.json();
+                // קבלת הקובץ כ-blob
+                const blob = await response.blob();
                 
-                // ממיר את כל התאריכים לפורמט הרצוי
-                const formattedTrips = trips.map(trip => ({
-                    ...trip,
-                    date_time: formatDateForExcel(trip.date_time),
-                    end_time: formatDateForExcel(trip.end_time)
-                }));
+                // יצירת URL לקובץ
+                const url = window.URL.createObjectURL(blob);
+                
+                // יצירת אלמנט להורדה
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `trips_report_${new Date().toISOString().slice(0,10)}.xlsx`;
+                
+                // הוספה לדף והפעלת הלחיצה
+                document.body.appendChild(a);
+                a.click();
+                
+                // ניקוי
+                window.URL.revokeObjectURL(url);
+                a.remove();
 
-                // המשך הקוד לייצוא לאקסל...
+                showNotification('הדוח יוצא בהצלחה', 'success');
             } catch (error) {
-                console.error('Error exporting to Excel:', error);
-                showNotification(error.message, 'error');
+                console.error('Error exporting trips:', error);
+                showNotification('שגיאה בייצוא הדוח', 'error');
             }
         }
 
