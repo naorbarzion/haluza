@@ -130,6 +130,86 @@
         <div class="glass-effect rounded-2xl shadow-lg p-8 mb-8 fade-in">
             <div class="flex items-center gap-3 mb-6">
                 <div class="bg-blue-100 p-3 rounded-lg">
+                    <i class="fas fa-filter text-blue-600 text-xl"></i>
+                </div>
+                <h2 class="text-2xl font-bold">סינון והורדת דוחות</h2>
+            </div>
+            
+            <form id="searchForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- בחירת נהג -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-user ml-2"></i>בחירת נהג
+                        </label>
+                        <select id="driverSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">כל הנהגים</option>
+                        </select>
+                    </div>
+
+                    <!-- בחירת רכב -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-car ml-2"></i>בחירת רכב
+                        </label>
+                        <select id="vehicleSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">כל הרכבים</option>
+                            <option value="car1">יונדאי איוניק - 53836402</option>
+                            <option value="car2">טויוטה סיטי - 15093804</option>
+                            <option value="car3">מרצדס בנץ - 19826603</option>
+                        </select>
+                    </div>
+
+                    <!-- סטטוס -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-check-circle ml-2"></i>סטטוס
+                        </label>
+                        <select id="statusSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">כל הסטטוסים</option>
+                            <option value="pending">ממתין לאישור</option>
+                            <option value="approved">מאושר</option>
+                            <option value="rejected">נדחה</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- תאריכים -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar ml-2"></i>מתאריך
+                        </label>
+                        <input type="date" id="startDate" 
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar ml-2"></i>עד תאריך
+                        </label>
+                        <input type="date" id="endDate" 
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <!-- כפתורים -->
+                <div class="flex justify-end gap-4">
+                    <button type="button" id="searchBtn"
+                            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-search ml-2"></i>חפש
+                    </button>
+                    <button type="button" id="exportBtn"
+                            class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                        <i class="fas fa-file-excel ml-2"></i>ייצא לאקסל
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Results Section -->
+        <div class="glass-effect rounded-2xl shadow-lg p-8 mb-8 fade-in">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="bg-blue-100 p-3 rounded-lg">
                     <i class="fas fa-list text-blue-600 text-xl"></i>
                 </div>
                 <h2 class="text-2xl font-bold">רשימת נסיעות</h2>
@@ -138,18 +218,6 @@
             <div id="tripsContainer" class="space-y-4">
                 <!-- הנסיעות יוצגו כאן -->
             </div>
-        </div>
-
-        <!-- Calendar Section -->
-        <div class="glass-effect rounded-2xl shadow-lg p-8 fade-in">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="bg-indigo-100 p-3 rounded-lg">
-                    <i class="fas fa-calendar-alt text-indigo-600 text-xl"></i>
-                </div>
-                <h2 class="text-2xl font-bold">לוח נסיעות</h2>
-            </div>
-
-            <div id="calendar" class="bg-white rounded-lg p-4"></div>
         </div>
     </main>
 
