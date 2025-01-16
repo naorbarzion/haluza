@@ -21,6 +21,11 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/he.js"></script>
     
+    <!-- Tippy.js for tooltips -->
+    <script src="https://unpkg.com/@popperjs/core@2"></script>
+    <script src="https://unpkg.com/tippy.js@6"></script>
+    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/dist/tippy.css" />
+    
     <style>
         /* Custom styles */
         .glass-effect {
@@ -41,6 +46,46 @@
         /* FullCalendar RTL fixes */
         .fc {
             direction: rtl;
+        }
+
+        /* FullCalendar Custom Styles */
+        .fc {
+            direction: rtl;
+            text-align: right;
+        }
+
+        .fc-event {
+            cursor: pointer;
+            padding: 4px 6px !important;
+            margin-bottom: 2px !important;
+            border-radius: 4px !important;
+            font-size: 0.875rem !important;
+            min-height: 40px !important;
+        }
+
+        .fc-event.approved {
+            background-color: rgba(220, 252, 231, 0.9) !important;
+            border-color: #22c55e !important;
+            color: #166534 !important;
+        }
+
+        .fc-event.pending {
+            background-color: rgba(254, 249, 195, 0.9) !important;
+            border-color: #eab308 !important;
+            color: #854d0e !important;
+        }
+
+        .fc-event.rejected {
+            background-color: rgba(254, 226, 226, 0.9) !important;
+            border-color: #ef4444 !important;
+            color: #991b1b !important;
+        }
+
+        .fc-daygrid-event {
+            white-space: normal !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
         }
     </style>
 </head>
@@ -215,10 +260,10 @@
 
             // אתחול הקלנדר
             const calendarEl = document.getElementById('calendar');
-            calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'dayGridMonth',
-                direction: 'rtl',
+            const calendar = new FullCalendar.Calendar(calendarEl, {
                 locale: 'he',
+                direction: 'rtl',
+                initialView: 'dayGridMonth',
                 headerToolbar: {
                     right: 'prev,next today',
                     center: 'title',
@@ -230,35 +275,43 @@
                     week: 'שבוע',
                     day: 'יום'
                 },
-                views: {
-                    dayGrid: {
-                        titleFormat: { year: 'numeric', month: 'long' }
-                    },
-                    timeGrid: {
-                        dayHeaderFormat: { weekday: 'long' }
-                    }
-                },
-                firstDay: 0,
-                nowIndicator: true,
-                eventClick: function(info) {
-                    showEventDetails(info.event);
+                eventDidMount: function(info) {
+                    // הוספת קלאס לפי סטטוס
+                    info.el.classList.add(info.event.extendedProps.status);
+                    
+                    // הוספת טולטיפ מפורט
+                    tippy(info.el, {
+                        content: `
+                            <div class="text-right p-2">
+                                <div class="font-bold mb-1">${info.event.extendedProps.driver_name || 'לא צוין'}</div>
+                                <div class="text-sm">
+                                    <div>רכב: ${getVehicleName(info.event.extendedProps.vehicle)}</div>
+                                    <div>מטרה: ${info.event.title}</div>
+                                    <div>התחלה: ${formatDateTime(info.event.start)}</div>
+                                    <div>סיום: ${formatDateTime(info.event.end)}</div>
+                                </div>
+                            </div>
+                        `,
+                        allowHTML: true,
+                        placement: 'top',
+                        interactive: true,
+                        theme: 'light'
+                    });
                 },
                 eventContent: function(arg) {
                     return {
                         html: `
-                            <div class="p-1">
-                                <div class="text-xs font-bold">${formatTime(arg.event.start)} - ${formatTime(arg.event.end)}</div>
-                                <div class="text-xs">${arg.event.title}</div>
+                            <div class="fc-content">
+                                <div class="font-bold">${arg.event.extendedProps.driver_name || 'לא צוין'}</div>
+                                <div class="text-sm">${arg.event.title}</div>
                             </div>
                         `
                     };
-                },
-                eventClassNames: function(arg) {
-                    return [arg.event.extendedProps.status];
                 }
             });
             
             calendar.render();
+            window.calendar = calendar;  // שמירת הקלנדר כמשתנה גלובלי
             loadDrivers();
             searchTrips();
         });
@@ -344,28 +397,25 @@
 
         // עדכון הקלנדר
         function updateCalendar(trips) {
-            if (!calendar) return;
+            if (!window.calendar) return;
             
-            // נקה את כל האירועים הקיימים
-            calendar.removeAllEvents();
+            window.calendar.removeAllEvents();
             
-            // הוסף את הנסיעות כאירועים
             const events = trips.map(trip => ({
                 id: trip._id,
-                title: `${trip.driver_name} - ${trip.purpose}`,
-                start: trip.date_time,
-                end: trip.end_time,
+                title: trip.purpose,
+                start: normalizeDate(trip.date_time),
+                end: normalizeDate(trip.end_time),
                 extendedProps: {
+                    driver_name: trip.driver_name,
                     vehicle: trip.vehicle,
-                    purpose: trip.purpose,
-                    destination: trip.destination,
                     status: trip.status,
-                    rejection_reason: trip.rejection_reason
-                },
-                className: getStatusBadgeClass(trip.status)
+                    purpose: trip.purpose,
+                    destination: trip.destination
+                }
             }));
             
-            calendar.addEventSource(events);
+            window.calendar.addEventSource(events);
         }
 
         // הצגת פרטי נסיעה
@@ -629,18 +679,41 @@
         // נוסיף פונקציה לנירמול תאריכים
         function normalizeDate(dateStr) {
             if (!dateStr) return null;
+            
             try {
-                // אם התאריך בפורמט dd/mm/yyyy
+                // מנקה רווחים מיותרים
+                dateStr = dateStr.trim();
+                
+                // אם התאריך בפורמט dd/mm/yyyy HH:MM
                 if (dateStr.includes('/')) {
-                    const [day, month, year, time] = dateStr.split(/[/ ]/);
-                    const [hours, minutes] = (time || '00:00').split(':');
+                    const [datePart, timePart] = dateStr.split(' ');
+                    const [day, month, year] = datePart.split('/');
+                    const [hours, minutes] = (timePart || '00:00').split(':');
                     return new Date(year, month - 1, day, hours || 0, minutes || 0);
                 }
                 
-                // אחרת, ננסה לפרסר כרגיל
-                return new Date(dateStr);
+                // אם התאריך בפורמט ISO עם T
+                if (dateStr.includes('T')) {
+                    return new Date(dateStr);
+                }
+                
+                // אם התאריך בפורמט yyyy-mm-dd HH:MM:SS
+                const dateTimeRegex = /(\d{4})-(\d{2})-(\d{2})(?:T|\s)(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?/;
+                const match = dateStr.match(dateTimeRegex);
+                if (match) {
+                    const [_, year, month, day, hours, minutes, seconds] = match;
+                    return new Date(year, month - 1, day, hours, minutes, seconds || 0);
+                }
+                
+                // אם התאריך בפורמט yyyy-mm-dd
+                if (dateStr.includes('-')) {
+                    const [year, month, day] = dateStr.split('-');
+                    return new Date(year, month - 1, day);
+                }
+                
+                throw new Error(`Invalid date format: ${dateStr}`);
             } catch (error) {
-                console.error('Error normalizing date:', error);
+                console.error('Error normalizing date:', error, dateStr);
                 return null;
             }
         }
