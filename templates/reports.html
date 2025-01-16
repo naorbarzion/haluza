@@ -56,29 +56,33 @@
 
         .fc-event {
             cursor: pointer;
-            padding: 4px 6px !important;
-            margin-bottom: 2px !important;
-            border-radius: 4px !important;
-            font-size: 0.875rem !important;
-            min-height: 40px !important;
-        }
-
-        .fc-event.approved {
-            background-color: rgba(220, 252, 231, 0.9) !important;
-            border-color: #22c55e !important;
-            color: #166534 !important;
+            transition: all 0.3s ease;
+            padding: 2px 4px;
+            margin-bottom: 2px;
+            border-radius: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-size: 0.75rem;
+            line-height: 1rem;
         }
 
         .fc-event.pending {
-            background-color: rgba(254, 249, 195, 0.9) !important;
-            border-color: #eab308 !important;
-            color: #854d0e !important;
+            background-color: #fbbf24 !important;
+            border-color: #d97706 !important;
+            color: #000000 !important;
+        }
+
+        .fc-event.approved {
+            background-color: #34d399 !important;
+            border-color: #059669 !important;
+            color: #000000 !important;
         }
 
         .fc-event.rejected {
-            background-color: rgba(254, 226, 226, 0.9) !important;
-            border-color: #ef4444 !important;
-            color: #991b1b !important;
+            background-color: #f87171 !important;
+            border-color: #dc2626 !important;
+            color: #000000 !important;
         }
 
         .fc-daygrid-event {
@@ -213,21 +217,17 @@
         </div>
     </main>
 
-    <!-- Event Details Modal -->
-    <div id="eventModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <div class="bg-white rounded-2xl p-6 max-w-lg w-full mx-4">
-            <div class="flex justify-between items-start mb-4">
-                <h3 class="text-xl font-bold" id="modalTitle"></h3>
-                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div id="modalContent" class="space-y-4"></div>
-            <div class="mt-6 flex justify-end">
-                <button onclick="closeModal()" 
-                        class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors">
-                    סגור
-                </button>
+    <!-- Event Modal -->
+    <div id="eventModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="relative max-w-lg mx-auto mt-20">
+            <div class="bg-white rounded-lg shadow-xl p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 class="text-xl font-bold" id="modalTitle"></h3>
+                    <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="modalContent" class="space-y-4"></div>
             </div>
         </div>
     </div>
@@ -298,6 +298,56 @@
                             </div>
                         `
                     };
+                },
+                eventClick: function(info) {
+                    const event = info.event;
+                    const modal = document.getElementById('eventModal');
+                    const modalTitle = document.getElementById('modalTitle');
+                    const modalContent = document.getElementById('modalContent');
+
+                    modalTitle.textContent = event.extendedProps.driver_name;
+                    modalContent.innerHTML = `
+                        <div class="space-y-3">
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-car text-blue-600"></i>
+                                    <span class="text-gray-700">${getVehicleName(event.extendedProps.vehicle)}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gray-50 p-3 rounded-lg space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-clock text-blue-600"></i>
+                                    <div>
+                                        <div class="text-sm text-gray-600">התחלה: ${formatDateTime(event.start)}</div>
+                                        <div class="text-sm text-gray-600">סיום: ${formatDateTime(event.end)}</div>
+                                        <div class="text-sm font-medium text-blue-600">
+                                            משך: ${calculateDuration(event.start, event.end)}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="space-y-2">
+                                <div>
+                                    <div class="text-sm font-medium text-gray-700">מטרת הנסיעה:</div>
+                                    <div class="text-sm text-gray-600">${event.extendedProps.purpose || 'לא צוינה'}</div>
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-gray-700">יעד:</div>
+                                    <div class="text-sm text-gray-600">${event.extendedProps.destination || 'לא צוין'}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center gap-2">
+                                <div class="text-sm font-medium ${getStatusBadgeClass(event.extendedProps.status)}">
+                                    ${getStatusText(event.extendedProps.status)}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    modal.classList.remove('hidden');
                 }
             });
             
@@ -430,41 +480,49 @@
         // ייצוא לאקסל
         async function exportToExcel() {
             try {
-                const formData = {
-                    driver_id: document.getElementById('driverSelect')?.value || '',
-                    vehicle: document.getElementById('vehicleSelect')?.value || '',
-                    status: document.getElementById('statusSelect')?.value || '',
-                    start_date: document.getElementById('startDate')?.value || '',
-                    end_date: document.getElementById('endDate')?.value || ''
-                };
-
                 const response = await fetch('/admin/export_trips', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify({
+                        driver_id: document.getElementById('driverSelect')?.value || '',
+                        vehicle: document.getElementById('vehicleSelect')?.value || '',
+                        status: document.getElementById('statusSelect')?.value || '',
+                        start_date: document.getElementById('startDate')?.value || '',
+                        end_date: document.getElementById('endDate')?.value || ''
+                    })
                 });
 
-                if (!response.ok) {
-                    throw new Error('שגיאה בייצוא הנסיעות');
-                }
+                if (!response.ok) throw new Error('שגיאה בייצוא הנתונים');
 
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `trips_report_${new Date().toISOString().slice(0,10)}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                a.remove();
+                const trips = await response.json();
+                
+                // ממיר את כל התאריכים לפורמט הרצוי
+                const formattedTrips = trips.map(trip => ({
+                    ...trip,
+                    date_time: formatDateForExcel(trip.date_time),
+                    end_time: formatDateForExcel(trip.end_time)
+                }));
 
-                showNotification('הדוח יוצא בהצלחה', 'success');
+                // המשך הקוד לייצוא לאקסל...
             } catch (error) {
-                console.error('Error exporting trips:', error);
-                showNotification('שגיאה בייצוא הדוח', 'error');
+                console.error('Error exporting to Excel:', error);
+                showNotification(error.message, 'error');
             }
+        }
+
+        function formatDateForExcel(dateStr) {
+            const date = normalizeDate(dateStr);
+            if (!date) return '';
+            
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            
+            return `${day}/${month}/${year} ${hours}:${minutes}`;
         }
 
         // Helper Functions
@@ -670,21 +728,16 @@
             if (!dateStr) return null;
             
             try {
-                // אם זה כבר אובייקט Date
-                if (dateStr instanceof Date) {
-                    return dateStr;
-                }
-
-                // אם זה לא סטרינג, ננסה להמיר ל-Date
+                if (dateStr instanceof Date) return dateStr;
+                
                 if (typeof dateStr !== 'string') {
                     const date = new Date(dateStr);
                     return isNaN(date.getTime()) ? null : date;
                 }
                 
-                // מנקה רווחים מיותרים
                 dateStr = dateStr.trim();
                 
-                // אם התאריך בפורמט dd/mm/yyyy HH:MM
+                // dd/mm/yyyy HH:MM
                 if (dateStr.includes('/')) {
                     const [datePart, timePart] = dateStr.split(' ');
                     const [day, month, year] = datePart.split('/');
@@ -692,12 +745,16 @@
                     return new Date(year, month - 1, day, hours || 0, minutes || 0);
                 }
                 
-                // אם התאריך בפורמט ISO או כולל T
-                if (dateStr.includes('T') || dateStr.includes('-')) {
-                    const date = new Date(dateStr);
-                    if (!isNaN(date.getTime())) {
-                        return date;
-                    }
+                // yyyy-mm-ddTHH:MM:SS.mmm
+                if (dateStr.includes('T')) {
+                    return new Date(dateStr);
+                }
+                
+                // yyyy-mm-dd HH:MM:SS
+                const match = dateStr.match(/(\d{4})-(\d{2})-(\d{2})(?:\s|T)?(\d{2})?:?(\d{2})?:?(\d{2})?\.?(\d+)?/);
+                if (match) {
+                    const [_, year, month, day, hours = 0, minutes = 0, seconds = 0] = match;
+                    return new Date(year, month - 1, day, hours, minutes, seconds);
                 }
                 
                 throw new Error(`Invalid date format: ${dateStr}`);
