@@ -135,55 +135,75 @@
                 <h2 class="text-2xl font-bold">סינון והורדת דוחות</h2>
             </div>
 
-            <form id="filterForm" class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-calendar ml-2"></i>מתאריך
-                    </label>
-                    <input type="text" id="dateFrom" placeholder="בחר תאריך התחלה" 
-                           class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+            <form id="searchForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- בחירת נהג -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-user ml-2"></i>בחירת נהג
+                        </label>
+                        <select id="driverSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">כל הנהגים</option>
+                        </select>
+                    </div>
+
+                    <!-- בחירת רכב -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-car ml-2"></i>בחירת רכב
+                        </label>
+                        <select id="vehicleSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">כל הרכבים</option>
+                            <option value="car1">יונדאי איוניק - 53836402</option>
+                            <option value="car2">טויוטה סיטי - 15093804</option>
+                            <option value="car3">מרצדס בנץ - 19826603</option>
+                        </select>
+                    </div>
+
+                    <!-- סטטוס -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-check-circle ml-2"></i>סטטוס
+                        </label>
+                        <select id="statusSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                            <option value="">כל הסטטוסים</option>
+                            <option value="pending">ממתין לאישור</option>
+                            <option value="approved">מאושר</option>
+                            <option value="rejected">נדחה</option>
+                        </select>
+                    </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-calendar ml-2"></i>עד תאריך
-                    </label>
-                    <input type="text" id="dateTo" placeholder="בחר תאריך סיום"
-                           class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                <!-- תאריכים -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar ml-2"></i>מתאריך
+                        </label>
+                        <input type="date" id="startDate" 
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-calendar ml-2"></i>עד תאריך
+                        </label>
+                        <input type="date" id="endDate" 
+                               class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-user ml-2"></i>בחירת נהג
-                    </label>
-                    <select id="driverSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                        <option value="">כל הנהגים</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        <i class="fas fa-check-circle ml-2"></i>סטטוס
-                    </label>
-                    <select id="statusSelect" class="w-full rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500">
-                        <option value="">כל הסטטוסים</option>
-                        <option value="pending">ממתין לאישור</option>
-                        <option value="approved">מאושר</option>
-                        <option value="rejected">נדחה</option>
-                    </select>
+                <!-- כפתורים -->
+                <div class="flex justify-end gap-4">
+                    <button type="button" id="searchBtn"
+                            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-search ml-2"></i>חפש
+                    </button>
+                    <button type="button" id="exportBtn"
+                            class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                        <i class="fas fa-file-excel ml-2"></i>ייצא לאקסל
+                    </button>
                 </div>
             </form>
-
-            <div class="flex justify-between mt-6">
-                <button id="searchBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
-                    <i class="fas fa-search"></i>
-                    חפש
-                </button>
-                <button id="exportBtn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2">
-                    <i class="fas fa-file-excel"></i>
-                    ייצא לאקסל
-                </button>
-            </div>
         </div>
 
         <!-- Calendar Section -->
@@ -303,11 +323,11 @@
     async function searchTrips() {
         try {
             const formData = {
-                driver_id: document.getElementById('driverSelect').value,
-                vehicle: document.getElementById('vehicleSelect').value,
-                status: document.getElementById('statusSelect').value,
-                start_date: document.getElementById('startDate').value,
-                end_date: document.getElementById('endDate').value
+                driver_id: document.getElementById('driverSelect')?.value || '',
+                vehicle: document.getElementById('vehicleSelect')?.value || '',
+                status: document.getElementById('statusSelect')?.value || '',
+                start_date: document.getElementById('startDate')?.value || '',
+                end_date: document.getElementById('endDate')?.value || ''
             };
 
             const response = await fetch('/admin/search_trips', {
@@ -324,6 +344,11 @@
 
             const trips = await response.json();
             displayTrips(trips);
+            
+            // עדכון הקלנדר אם קיים
+            if (typeof updateCalendar === 'function') {
+                updateCalendar(trips);
+            }
         } catch (error) {
             console.error('Error searching trips:', error);
             showNotification(error.message, 'error');
@@ -388,11 +413,11 @@
     async function exportToExcel() {
         try {
             const formData = {
-                driver_id: document.getElementById('driverSelect').value,
-                vehicle: document.getElementById('vehicleSelect').value,
-                status: document.getElementById('statusSelect').value,
-                start_date: document.getElementById('startDate').value,
-                end_date: document.getElementById('endDate').value
+                driver_id: document.getElementById('driverSelect')?.value || '',
+                vehicle: document.getElementById('vehicleSelect')?.value || '',
+                status: document.getElementById('statusSelect')?.value || '',
+                start_date: document.getElementById('startDate')?.value || '',
+                end_date: document.getElementById('endDate')?.value || ''
             };
 
             const response = await fetch('/admin/export_trips', {
@@ -404,10 +429,9 @@
             });
 
             if (!response.ok) {
-                throw new Error('Failed to export');
+                throw new Error('שגיאה בייצוא הנסיעות');
             }
 
-            // קבלת הקובץ והורדתו
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -494,8 +518,8 @@
     }
 
     // Event Listeners
-    document.getElementById('searchBtn').addEventListener('click', searchTrips);
-    document.getElementById('exportBtn').addEventListener('click', exportToExcel);
+    document.getElementById('searchBtn')?.addEventListener('click', searchTrips);
+    document.getElementById('exportBtn')?.addEventListener('click', exportToExcel);
 
     // Close modal when clicking outside
     window.onclick = function(event) {
