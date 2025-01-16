@@ -285,11 +285,16 @@
                     });
                 },
                 eventContent: function(arg) {
+                    const timeText = arg.timeText || '';
+                    const driverName = arg.event.extendedProps.driver_name || 'לא צוין';
+                    const purpose = arg.event.title || 'לא צוינה מטרה';
+                    
                     return {
                         html: `
-                            <div class="fc-content">
-                                <div class="font-bold">${arg.event.extendedProps.driver_name || 'לא צוין'}</div>
-                                <div class="text-sm">${arg.event.title}</div>
+                            <div class="fc-content p-1">
+                                <div class="font-bold text-sm">${driverName}</div>
+                                <div class="text-xs">${purpose}</div>
+                                ${timeText ? `<div class="text-xs mt-1">${timeText}</div>` : ''}
                             </div>
                         `
                     };
@@ -324,19 +329,6 @@
         // חיפוש והצגת נסיעות
         async function searchTrips() {
             try {
-                const container = document.getElementById('tripsContainer');
-                if (!container) {
-                    console.error('Container not found!');
-                    return;
-                }
-
-                container.innerHTML = `
-                    <div class="flex justify-center items-center py-8">
-                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                        <span class="mr-3">טוען נסיעות...</span>
-                    </div>
-                `;
-
                 const formData = {
                     driver_id: document.getElementById('driverSelect')?.value || '',
                     vehicle: document.getElementById('vehicleSelect')?.value || '',
@@ -362,21 +354,11 @@
                 const trips = await response.json();
                 console.log('Received trips:', trips);  // לוג לדיבוג
 
-                displayTrips(trips);
+                // עדכון הקלנדר עם הנסיעות
                 updateCalendar(trips);
 
             } catch (error) {
                 console.error('Error searching trips:', error);
-                const container = document.getElementById('tripsContainer');
-                if (container) {
-                    container.innerHTML = `
-                        <div class="text-center text-red-500 py-8">
-                            <i class="fas fa-exclamation-circle text-xl mb-2"></i>
-                            <div>אירעה שגיאה בטעינת הנסיעות</div>
-                            <div class="text-sm">${error.message}</div>
-                        </div>
-                    `;
-                }
                 showNotification(error.message, 'error');
             }
         }
@@ -387,19 +369,25 @@
             
             window.calendar.removeAllEvents();
             
-            const events = trips.map(trip => ({
-                id: trip._id,
-                title: trip.purpose,
-                start: normalizeDate(trip.date_time),
-                end: normalizeDate(trip.end_time),
-                extendedProps: {
-                    driver_name: trip.driver_name,
-                    vehicle: trip.vehicle,
-                    status: trip.status,
-                    purpose: trip.purpose,
-                    destination: trip.destination
-                }
-            }));
+            const events = trips.map(trip => {
+                const startDate = normalizeDate(trip.date_time);
+                const endDate = normalizeDate(trip.end_time);
+                
+                return {
+                    id: trip._id,
+                    title: trip.purpose || 'לא צוינה מטרה',
+                    start: startDate,
+                    end: endDate,
+                    extendedProps: {
+                        driver_name: trip.driver_name || 'לא צוין',
+                        vehicle: trip.vehicle,
+                        status: trip.status,
+                        purpose: trip.purpose,
+                        destination: trip.destination
+                    },
+                    className: trip.status // לצורך הצבעים
+                };
+            }).filter(event => event.start && event.end); // מסנן אירועים ללא תאריכים תקינים
             
             window.calendar.addEventSource(events);
         }
