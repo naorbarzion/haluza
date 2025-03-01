@@ -429,6 +429,19 @@
             }
         }
 
+        // פונקציה לעדכון המונים
+        function updateCounters(tripsData) {
+            const pendingCount = tripsData.filter(trip => trip.status === 'pending').length;
+            const approvedCount = tripsData.filter(trip => trip.status === 'approved').length;
+            const totalCount = tripsData.length;
+            
+            document.getElementById('pendingCount').textContent = pendingCount;
+            document.getElementById('approvedCount').textContent = approvedCount;
+            document.getElementById('totalCount').textContent = totalCount;
+            
+            console.log('Counters updated:', { pendingCount, approvedCount, totalCount });
+        }
+
         // פונקציית חיפוש נסיעות
         async function searchTrips() {
             try {
@@ -460,6 +473,9 @@
                 
                 // הצגת הנסיעות
                 displayTrips();
+                
+                // עדכון המונים
+                updateCounters(trips);
                 
                 showNotification('החיפוש הושלם בהצלחה', 'success');
             } catch (error) {
@@ -686,7 +702,7 @@
                 if (data.status === 'success') {
                     showNotification('הנסיעה נדחתה בהצלחה', 'success');
                     closeRejectModal();
-                    await loadTrips();
+                    await loadTrips(); // זה יעדכן גם את המונים
                 } else {
                     throw new Error(data.message || 'אירעה שגיאה בדחיית הנסיעה');
                 }
@@ -751,7 +767,7 @@
                 if (data.status === 'success') {
                     showNotification('מועד הנסיעה עודכן בהצלחה', 'success');
                     closeRescheduleModal();
-                    await loadTrips();
+                    await loadTrips(); // זה יעדכן גם את המונים
                 } else {
                     throw new Error(data.message || 'אירעה שגיאה בעדכון מועד הנסיעה');
                 }
@@ -898,7 +914,7 @@
                 if (response.ok) {
                     showNotification('הנסיעה נוספה בהצלחה', 'success');
                     closeAddTripModal();
-                    loadTrips();  // רענון רשימת הנסיעות
+                    await loadTrips();  // זה יעדכן גם את המונים
                 } else {
                     throw new Error(result.message || 'אירעה שגיאה בהוספת הנסיעה');
                 }
@@ -968,7 +984,7 @@
                     
                     if (data.status === 'success') {
                         showNotification('הנסיעה נמחקה בהצלחה', 'success');
-                        await loadTrips();  // רענון הרשימה
+                        await loadTrips();  // זה יעדכן גם את המונים
                     } else {
                         throw new Error(data.message || 'אירעה שגיאה במחיקת הנסיעה');
                     }
@@ -1001,6 +1017,9 @@
                 
                 // הצגת הנסיעות
                 displayTrips();
+                
+                // עדכון המונים
+                updateCounters(trips);
                 
             } catch (error) {
                 console.error('Error loading trips:', error);
