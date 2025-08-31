@@ -169,3 +169,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Database backups and user management scripts
+database_backup_*.json
+backup_and_add_users.py
